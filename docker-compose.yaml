@@ -1,0 +1,28 @@
+version: "3.8"
+services:
+  rustdesk-api-server:
+    container_name: rustdesk-api-server
+    image: rustdesk-api-server:latest
+    env_file:
+      - .env
+    volumes:
+      - ./db:/rustdesk-api-server/db
+      - ./media:/rustdesk-api-server/media
+      - ./executables:/rustdesk-api-server/executables
+      - ./.well-known:/rustdesk-api-server/.well-known
+    expose:
+      - "80"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - rustdesk-api-server
+    restart: unless-stopped

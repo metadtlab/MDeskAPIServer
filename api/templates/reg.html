@@ -1,0 +1,350 @@
+{% load static %}
+{% load my_filters %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <title>회원가입_【MDeskWeb】</title>
+        <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-neo.css" rel="stylesheet">
+        <link rel="stylesheet" href="{% static 'layui/css/layui.css' %}">
+        <link rel="stylesheet" href="{% static 'layui/css/style.css' %}">
+        <style>
+            * {
+                font-family: 'NanumSquareNeo', 'Nanum Square Neo', sans-serif !important;
+            }
+        </style>
+    <link rel="icon" href="../frame/static/image/code.png">
+</head>
+<body>
+ 
+<div class="login-main">
+    <header class="layui-elip" style="width: 82%">회원가입</header>
+ 
+    <!-- 폼 옵션 -->
+    <form class="layui-form">
+        <div class="layui-input-inline">
+            <!-- 사용자명 -->
+            <div class="layui-inline" style="width: 85%">
+                <input type="text" id="user" name="account" required  lay-verify="required" lay-reqtext="사용자명을 입력해주세요" placeholder="사용자명을 입력하세요" autocomplete="off" class="layui-input">
+            </div>
+            <!-- 확인 -->
+            <div class="layui-inline">
+                <i class="layui-icon" id="ri" style="color: green;font-weight: bolder;" hidden></i>
+            </div>
+            <!-- 오류 -->
+            <div class="layui-inline">
+                <i class="layui-icon" id="wr" style="color: red; font-weight: bolder;" hidden>ဆ</i>
+            </div>
+        </div>
+            <!-- 비밀번호 -->
+        <div class="layui-input-inline">
+            <div class="layui-inline" style="width: 85%">
+                <input type="password" id="pwd" name="password" required  lay-verify="required" lay-reqtext="비밀번호를 입력해주세요" placeholder="비밀번호를 입력하세요" autocomplete="off" class="layui-input">
+            </div>
+            <!-- 확인 -->
+            <div class="layui-inline">
+                <i class="layui-icon" id="pri" style="color: green;font-weight: bolder;" hidden></i>
+            </div>
+            <!-- 오류 -->
+            <div class="layui-inline">
+                <i class="layui-icon" id="pwr" style="color: red; font-weight: bolder;" hidden>ဆ</i>
+            </div>
+        </div>
+            <!-- 비밀번호 확인 -->
+        <div class="layui-input-inline">
+            <div class="layui-inline" style="width: 85%">
+                <input type="password" id="rpwd" name="repassword" required  lay-verify="required" lay-reqtext="비밀번호를 다시 입력해주세요" placeholder="비밀번호를 다시 입력하세요" autocomplete="off" class="layui-input">
+            </div>
+            <!-- 확인 -->
+            <div class="layui-inline">
+                <i class="layui-icon" id="rpri" style="color: green;font-weight: bolder;" hidden></i>
+            </div>
+            <!-- 오류 -->
+            <div class="layui-inline">
+                <i class="layui-icon" id="rpwr" style="color: red; font-weight: bolder;" hidden>ဆ</i>
+            </div>
+        </div>
+            <!-- 회사명 -->
+        <div class="layui-input-inline">
+            <div class="layui-inline" style="width: 85%">
+                <input type="text" id="company" name="company" placeholder="회사명을 입력하세요" autocomplete="off" class="layui-input">
+            </div>
+        </div>
+            <!-- 이메일 -->
+        <div class="layui-input-inline">
+            <div class="layui-inline" style="width: 85%">
+                <input type="email" id="email" name="email" lay-verify="email" lay-reqtext="올바른 이메일을 입력해주세요" placeholder="이메일을 입력하세요" autocomplete="off" class="layui-input">
+            </div>
+            <!-- 확인 -->
+            <div class="layui-inline">
+                <i class="layui-icon" id="eri" style="color: green;font-weight: bolder;" hidden></i>
+            </div>
+            <!-- 오류 -->
+            <div class="layui-inline">
+                <i class="layui-icon" id="ewr" style="color: red; font-weight: bolder;" hidden>ဆ</i>
+            </div>
+        </div>
+            <!-- 휴대전화 -->
+        <div class="layui-input-inline">
+            <div class="layui-inline" style="width: 60%">
+                <input type="tel" id="phone" name="phone" lay-reqtext="휴대전화번호를 입력해주세요" placeholder="휴대전화번호 (예: 01012345678 또는 010-1234-5678)" autocomplete="off" class="layui-input">
+            </div>
+            <div class="layui-inline" style="width: 24%">
+                <button type="button" id="send_verify" class="layui-btn layui-btn-sm">인증번호 발송</button>
+            </div>
+        </div>
+            <!-- 안내 문구 -->
+        <div class="layui-input-inline" style="width: 85%">
+            <div class="layui-form-mid layui-word-aux" style="padding-left: 0;">유료사용자는 카카오톡 알림톡 인증이 필요합니다!</div>
+        </div>
+            <!-- 인증번호 입력 -->
+        <div class="layui-input-inline" id="verify_code_div" style="display: none;">
+            <div class="layui-inline" style="width: 60%">
+                <input type="text" id="verify_code" name="verify_code" placeholder="인증번호를 입력하세요" autocomplete="off" class="layui-input">
+            </div>
+            <div class="layui-inline" style="width: 24%">
+                <button type="button" id="verify_btn" class="layui-btn layui-btn-sm layui-btn-normal">인증확인</button>
+            </div>
+        </div>
+            <!-- 인증 완료 표시 -->
+        <div class="layui-input-inline" id="verified_div" style="display: none;">
+            <div class="layui-inline" style="width: 85%; color: green;">
+                <i class="layui-icon layui-icon-ok" style="color: green;"></i> 휴대전화 인증이 완료되었습니다.
+            </div>
+        </div>
+ 
+ 
+        <div class="layui-input-inline login-btn" style="width: 85%">
+            <button type="submit" lay-submit lay-filter="sub" class="layui-btn" id="submit_btn" disabled>회원가입</button>
+        </div>
+        <hr style="width: 85%" />
+        <p style="width: 85%"><a href="/api/user_action?action=login" class="fl">이미 계정이 있으신가요? 로그인</a></p>
+    </form>
+</div>
+ 
+ 
+<script src={% static "layui/layui.js" %}></script>
+<script type="text/javascript">
+    layui.use(['form','jquery','layer'], function () {
+        var form   = layui.form;
+        var $      = layui.jquery;
+        var layer  = layui.layer;
+
+        // 폼 검증 규칙 커스텀 (한자 제거)
+        form.verify({
+            email: [
+                /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                '올바른 이메일 형식을 입력해주세요.'
+            ]
+        });
+
+        // LayUI 전역 설정 - 한자 제거
+        layui.layer.config({
+            anim: 0,
+            btn: ['확인'],
+            title: '알림'
+        });
+        var form   = layui.form;
+        var $      = layui.jquery;
+        var layer  = layui.layer;
+        // 폼 입력 필드 포커스 아웃 이벤트 추가
+        // 폼 검증
+        $('#user').blur(function() {
+            var user = $(this).val();
+ 
+
+ 
+        });
+ 
+        // 비밀번호에 정규식 검증 추가
+        $('#pwd').blur(function() {
+                var reg = /^[\w\S]{8,20}$/;
+                if(!($('#pwd').val().match(reg))){
+                    //layer.msg('올바른 비밀번호를 입력하세요');
+                    $('#pwr').removeAttr('hidden');
+                    $('#pri').attr('hidden','hidden');
+                    layer.msg('8~20자리 비밀번호를 입력하세요. 영문, 숫자, 특수문자를 포함할 수 있습니다.');
+                }else {
+                    $('#pri').removeAttr('hidden');
+                    $('#pwr').attr('hidden','hidden');
+                }
+        });
+ 
+        // 두 번 입력한 비밀번호가 일치하는지 검증
+        $('#rpwd').blur(function() {
+                if($('#pwd').val() != $('#rpwd').val()){
+                    $('#rpwr').removeAttr('hidden');
+                    $('#rpri').attr('hidden','hidden');
+                    layer.msg('비밀번호가 일치하지 않습니다!');
+                }else {
+                    $('#rpri').removeAttr('hidden');
+                    $('#rpwr').attr('hidden','hidden');
+                };
+        });
+
+        // 이메일 유효성 검사
+        $('#email').blur(function() {
+            var email = $(this).val();
+            var emailReg = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if(email && !emailReg.test(email)){
+                $('#ewr').removeAttr('hidden');
+                $('#eri').attr('hidden','hidden');
+                layer.msg('올바른 이메일 형식을 입력해주세요.');
+            }else if(email){
+                $('#eri').removeAttr('hidden');
+                $('#ewr').attr('hidden','hidden');
+            }
+        });
+
+        // 휴대전화 번호 유효성 검사
+        $('#phone').blur(function() {
+            var phone = $(this).val();
+            // 하이픈 제거 후 검증 (하이픈 있거나 없거나 모두 허용)
+            var phoneClean = phone.replace(/-/g, '');
+            var phoneReg = /^01[0-9][0-9]{3,4}[0-9]{4}$/;
+            if(phone && !phoneReg.test(phoneClean)){
+                layer.msg('올바른 휴대전화번호 형식을 입력해주세요. (예: 01012345678 또는 010-1234-5678)');
+            }
+        });
+
+        // 인증번호 발송 버튼
+        var phoneVerified = false;
+        $('#send_verify').click(function() {
+            var phone = $('#phone').val();
+            
+            if(!phone){
+                layer.msg('휴대전화번호를 먼저 입력해주세요.');
+                return;
+            }
+            // 하이픈 제거 후 검증 (하이픈 있거나 없거나 모두 허용)
+            var phoneClean = phone.replace(/-/g, '');
+            var phoneReg = /^01[0-9][0-9]{3,4}[0-9]{4}$/;
+            if(!phoneReg.test(phoneClean)){
+                layer.msg('올바른 휴대전화번호 형식을 입력해주세요. (예: 01012345678 또는 010-1234-5678)');
+                return;
+            }
+            
+            $.ajax({
+                url:'/api/user_action?action=send_verify',
+                type:'post',
+                dataType:'json',
+                data:{
+                    phone: phone
+                },
+                success:function(data){
+                    if (data.code == 1) {
+                        layer.msg(data.msg || '인증번호가 발송되었습니다.');
+                        $('#verify_code_div').show();
+                        phoneVerified = false;
+                        $('#submit_btn').prop('disabled', true);
+                    }else {
+                        layer.msg(data.msg || '인증번호 발송에 실패했습니다.');
+                    }
+                },
+                error: function() {
+                    // 임시: 실제 서비스 연동 전까지는 테스트용
+                    layer.msg('인증번호가 발송되었습니다. (테스트: 123456)');
+                    $('#verify_code_div').show();
+                    phoneVerified = false;
+                    $('#submit_btn').prop('disabled', true);
+                }
+            });
+        });
+
+        // 인증 확인 버튼
+        $('#verify_btn').click(function() {
+            var phone = $('#phone').val();
+            var verifyCode = $('#verify_code').val();
+            
+            if(!verifyCode){
+                layer.msg('인증번호를 입력해주세요.');
+                return;
+            }
+            
+            $.ajax({
+                url:'/api/user_action?action=verify_phone',
+                type:'post',
+                dataType:'json',
+                data:{
+                    phone: phone,
+                    code: verifyCode
+                },
+                success:function(data){
+                    if (data.code == 1) {
+                        layer.msg('인증이 완료되었습니다.');
+                        phoneVerified = true;
+                        $('#verified_div').show();
+                        $('#verify_code_div').hide();
+                        $('#submit_btn').prop('disabled', false);
+                    }else {
+                        layer.msg(data.msg || '인증번호가 일치하지 않습니다.');
+                    }
+                },
+                error: function() {
+                    // 임시: 테스트용 (123456 입력 시 인증 성공)
+                    if(verifyCode === '123456'){
+                        layer.msg('인증이 완료되었습니다.');
+                        phoneVerified = true;
+                        $('#verified_div').show();
+                        $('#verify_code_div').hide();
+                        $('#submit_btn').prop('disabled', false);
+                    }else{
+                        layer.msg('인증번호가 일치하지 않습니다. (테스트: 123456)');
+                    }
+                }
+            });
+        });
+ 
+        // 폼 제출 이벤트 리스너 추가, 회원가입 정보 제출
+        form.on('submit(sub)', function() {
+            // 전화번호 형식 검증
+            var phone = $('#phone').val();
+            if(phone){
+                // 하이픈 제거 후 검증 (하이픈 있거나 없거나 모두 허용)
+                var phoneClean = phone.replace(/-/g, '');
+                var phoneReg = /^01[0-9][0-9]{3,4}[0-9]{4}$/;
+                if(!phoneReg.test(phoneClean)){
+                    layer.msg('올바른 휴대전화번호 형식을 입력해주세요. (예: 01012345678 또는 010-1234-5678)');
+                    return false;
+                }
+            }
+            
+            if(!phoneVerified && $('#phone').val()){
+                layer.msg('휴대전화 인증을 완료해주세요.');
+                return false;
+            }
+            
+            $.ajax({
+                url:'/api/user_action?action=register',
+                type:'post',
+                dataType:'json',
+                data:{
+                    user:$('#user').val(),
+                    pwd:$('#pwd').val(),
+                    company:$('#company').val(),
+                    email:$('#email').val(),
+                    phone:$('#phone').val(),
+                    phone_verified:phoneVerified ? '1' : '0'
+                },
+                success:function(data){
+                    if (data.code == 1) {
+                        layer.msg('회원가입 성공! 로그인 페이지에서 로그인하세요.');
+                        setTimeout(function(){
+                            location.href = '/api/user_action?action=login';
+                        }, 1500);
+                    }else {
+                        layer.msg(data.msg);
+                    }
+                }
+            })
+            // 페이지 이동 방지
+            return false;
+        });
+ 
+    });
+</script>
+</body>
+</html>

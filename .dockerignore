@@ -1,0 +1,47 @@
+# Git 관련
+.git
+.gitignore
+.github
+
+# 환경 설정 (서버별로 다름)
+.env
+.env.*
+
+# Docker 이미지 파일
+*.tar
+rustdesk_image.tar
+
+# Python 캐시
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE 설정
+.vscode
+.idea
+*.swp
+*.swo
+
+# 로컬 데이터베이스 파일 (sqlite만 제외, db 폴더는 필요)
+*.sqlite3
+db.sqlite3_bak
+
+# 미디어 파일 (배포 서버에서 별도 관리)
+media/custom_logos/
+
+# 문서 및 이미지
+*.md
+images/
+tutorial/
+
+# 개발용 파일
+*.log
+*.bak
+
+# 배포 스크립트 (이미지에 필요 없음)
+save_image.bat
+load_image.sh
+deploy.bat
+

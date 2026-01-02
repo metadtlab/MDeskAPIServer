@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if config and config.app_name %}{{ config.app_name }}{% else %}{{ target_user.first_name|default:target_user.username }}{% endif %} 원격 지원 센터 - MDesk</title>
+    <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-neo.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/layui/css/layui.css">
+    <style>
+        :root {
+            --primary-color: #2b58f0;
+            --primary-hover: #1a44d1;
+            --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            --card-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            --item-shadow: 0 10px 20px rgba(43, 88, 240, 0.15);
+        }
+
+        body {
+            font-family: 'NanumSquareNeo', sans-serif;
+            background: var(--bg-gradient);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 900px;
+            background-color: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 30px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 40px 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .header-title {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .header-title h1 {
+            font-size: 24px;
+            font-weight: 800;
+            margin: 0;
+            color: #222;
+        }
+
+        .header-title p {
+            font-size: 16px;
+            color: #666;
+            margin: 0;
+        }
+
+        .header-title p span {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        .contact-box {
+            background-color: #f8faff;
+            border: 1px solid #e1e8ff;
+            padding: 12px 25px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .contact-box i {
+            color: var(--primary-color);
+            font-size: 20px;
+        }
+
+        .contact-box span {
+            font-size: 18px;
+            font-weight: 700;
+            color: #444;
+        }
+
+        .main-content {
+            padding: 80px 50px;
+            min-height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .agent-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 50px;
+            width: 100%;
+        }
+
+        .agent-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .agent-button {
+            width: 140px;
+            height: 140px;
+            background: white;
+            border: 2px solid #eee;
+            border-radius: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--primary-color);
+            font-size: 64px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-decoration: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.03);
+        }
+
+        .agent-card:hover .agent-button {
+            transform: translateY(-15px);
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            box-shadow: var(--item-shadow);
+        }
+
+        .agent-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #222;
+            transition: color 0.3s ease;
+        }
+
+        .agent-card:hover .agent-name {
+            color: var(--primary-color);
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            font-size: 18px;
+            padding: 50px;
+        }
+
+        .footer {
+            background-color: #fcfcfc;
+            padding: 30px 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .footer-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #888;
+            font-size: 15px;
+        }
+
+        .refresh-btn {
+            background-color: white;
+            color: #555;
+            border: 1px solid #ddd;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+            background-color: #f8faff;
+        }
+
+        /* 반응형 */
+        @media (max-width: 600px) {
+            .header { padding: 30px; flex-direction: column; gap: 20px; align-items: flex-start; }
+            .main-content { padding: 50px 30px; }
+            .footer { padding: 30px; flex-direction: column; gap: 20px; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-title">
+                <h1>{% if config and config.app_name %}{{ config.app_name }}{% else %}{{ target_user.first_name|default:target_user.username }}{% endif %} 원격 지원 센터</h1>
+                <p>안내받으신 <span>상담원 번호</span>를 선택해 주세요.</p>
+            </div>
+            <div class="contact-box">
+                <i class="layui-icon layui-icon-cellphone"></i>
+                <span>{% if config and config.phone %}{{ config.phone }}{% elif target_user.phone %}{{ target_user.phone }}{% else %}010-8612-8855{% endif %}</span>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <form id="downloadForm" action="/api/custom_app" method="POST" style="display: none;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="download">
+                <input type="hidden" name="target_username" value="{{ target_user.username }}">
+            </form>
+
+            <div class="agent-grid">
+                {% for agent in agents %}
+                <div class="agent-card">
+                    <a href="javascript:void(0);" onclick="downloadAgent('{{ agent.agent_num }}');" class="agent-button">
+                        {{ agent.agent_num }}
+                    </a>
+                    <div class="agent-name">{{ agent.agent_name }}</div>
+                </div>
+                {% empty %}
+                <div class="empty-state">
+                    <i class="layui-icon layui-icon-face-surprised" style="font-size: 48px; display: block; margin-bottom: 15px;"></i>
+                    현재 접속 가능한 상담원이 없습니다.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div class="footer-info">
+                <i class="layui-icon layui-icon-info"></i>
+                번호가 보이지 않으면 새로고침을 클릭하세요.
+            </div>
+            <a href="javascript:location.reload();" class="refresh-btn">
+                <i class="layui-icon layui-icon-refresh"></i> 새로고침
+            </a>
+        </div>
+    </div>
+
+    <script src="/static/layui/layui.js"></script>
+    <script>
+        function downloadAgent(agentNum) {
+            var layer = layui.layer;
+            var loadIndex = layer.load(2);
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/custom_app', true);
+            xhr.responseType = 'blob';
+            
+            var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            var formData = new FormData();
+            formData.append('action', 'download');
+            formData.append('csrfmiddlewaretoken', csrfToken);
+            formData.append('target_username', '{{ target_user.username }}');
+
+            xhr.onload = function() {
+                layer.close(loadIndex);
+                if (xhr.status === 200) {
+                    var filename = 'MDesk_portable-id={{ target_user.username }},agentid=' + agentNum + '.exe';
+                    var blob = xhr.response;
+                    var url = window.URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    layer.msg('다운로드 중 오류가 발생했습니다.', {icon: 2});
+                }
+            };
+            xhr.onerror = function() {
+                layer.close(loadIndex);
+                layer.msg('네트워크 오류가 발생했습니다.', {icon: 2});
+            };
+            xhr.send(formData);
+        }
+    </script>
+</body>
+</html>

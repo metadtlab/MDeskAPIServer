@@ -1,0 +1,140 @@
+
+{% extends "base.html" %}{% load static %}
+{% load my_filters %}
+{% block title %}기기 공유{% endblock %}
+{% block link %}<link rel="stylesheet" href="{% static 'layui/css/style.css' %}">{% endblock %}
+{% block legend_name %}다른 사용자에게 기기 공유{% endblock %}
+{% block content %}
+ 
+ 
+<div class="layui-container">
+    <div class="layui-card layui-col-md3-offset2">
+        <div class="layui-card-header">공유할 기기를 오른쪽으로 이동하세요</div>
+        <div id="showdevice"></div>
+        <button id="create" type="button" class="layui-btn padding-5" lay-on="getData">공유 링크 생성</button>
+    </div> 
+    <div class="layui-card">1. 링크 유효 기간은 15분입니다. 타인에게 함부로 공유하지 마세요.</div>
+    <div class="layui-card">2. 공유된 기기는 동일한 권한을 가집니다. 비밀번호가 저장된 경우 공유받은 사람도 직접 연결할 수 있습니다.</div>
+    <div class="layui-card">3. 보안을 위해 링크 유효 기간은 15분이며, 1회만 유효합니다. 다른 로그인 사용자가 접속하면 공유가 활성화되고, 이후 링크는 무효화됩니다.</div>
+    
+    <div class="layui-card layui-col-md6-offset1">
+          <table class="layui-table">
+            <colgroup>
+              <col width="30">
+              <col width="150">
+              <col width="200">
+              <col>
+            </colgroup>
+            <thead>
+              <tr>
+                <th>링크 주소</th>
+                <th>생성 시간</th>
+                <th>ID 목록</th>
+              </tr> 
+            </thead>
+            <tbody>
+            
+            {% for one in sharelinks %}
+              <tr>
+                <td><script> document.write(window.location);</script>/{{one.shash}} </td>
+                <td>{{one.create_time}}		</td>
+                <td>{{one.peers}}		</td>
+
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+    </div> 
+    
+
+</div>
+
+ <script>
+  layui.use(['transfer', 'jquery', 'layer'], function(){
+    // LayUI 전역 설정 - 한자 제거
+    layui.layer.config({
+        anim: 0,
+        btn: ['확인'],
+        title: '알림'
+    });
+    var transfer = layui.transfer;
+    var $      = layui.jquery;
+    var layer  = layui.layer;
+
+    //渲染
+    transfer.render({
+      elem: '#showdevice'  //绑定元素
+      ,title: ['내 기기', '공유 기기']  //自定义标题
+      //,width: 500 //定义宽度
+      //,height: 300 //定义高度
+      ,data: [//定义数据源
+      {%for peer in peers %}
+      {"value": "{{peer.id}}", "title": "{{peer.name}}"},
+      {%endfor%}
+
+      ]  //disabled 是否禁用  checked 是否选中
+      ,id: 'device' //定义索引 重新加载reload或者获取右侧数据时可以用到
+      ,text: {
+        none: '데이터 없음',
+        noneSelected: '선택된 항목 없음'
+      }
+    });
+    
+    // layui transfer의 "无数据" 텍스트를 한글로 변경 (한 번만 실행)
+    var replaced = false;
+    function replaceNoDataText() {
+      if (replaced) return; // 이미 실행했으면 중단
+      
+      // showdevice 내부 요소만 확인
+      var $container = $('#showdevice');
+      if ($container.length > 0) {
+        $container.find('*').each(function() {
+          var $elem = $(this);
+          var html = $elem.html();
+          if (html && html.indexOf('无数据') !== -1) {
+            $elem.html(html.replace(/无数据/g, '데이터 없음'));
+            replaced = true;
+          }
+        });
+      }
+    }
+    
+    // 렌더링 후 한 번만 실행
+    setTimeout(function() {
+      replaceNoDataText();
+    }, 500);
+    $("#create_bak").click(function(){
+        
+        var getData = transfer.getData('device');
+        alert(JSON.stringify(getData));
+
+    });
+    $("#create").click(function(){
+        var getData = transfer.getData('device');
+        $.ajax({
+            url:'/api/share',
+            type:'post',
+            dataType:'json',
+            data:{
+                data:JSON.stringify(getData),
+            },
+            success:function(data){
+                if (data.code == 1) {
+                   // var myMsg = layer.msg('처리 중', {
+                    //      shade: 0.4,
+                     //     time:false //取消自动关闭
+                    // });  
+                    //layer.msg('회원가입 성공! 로그인 페이지에서 로그인하세요.');
+                    layer.alert('성공! 공유하려면 아래 링크를 복사하여 다른 사람에게 전달하세요:<br>'+ window.location + '/' +data.shash, {title:'알림', btn:['확인']}, function (index) {
+                        location.reload();});                    
+                }else {
+                    layer.msg(data.msg);
+                }
+            }
+        });
+
+    });
+
+  });
+  </script>
+{% endblock %}

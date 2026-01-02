@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+{% load static %}
+{% load my_filters %}
+{% block title %}그룹관리{% endblock %}
+{% block legend_name %}그룹관리{% endblock %}
+{% block content %}
+<div style="padding: 20px; background-color: #F2F2F2;">
+  <div class="layui-row layui-col-space15">
+    <!-- 좌측: 그룹 등록/수정 폼 -->
+    <div class="layui-col-md5">
+      <div class="layui-card">
+        <div class="layui-card-header">
+          <i class="layui-icon layui-icon-add-circle"></i>
+          {% if edit_group %}그룹 수정{% else %}새 그룹 등록{% endif %}
+        </div>
+        <div class="layui-card-body">
+          <form class="layui-form" id="groupForm">
+            <input type="hidden" id="group_id" name="group_id" value="{% if edit_group %}{{edit_group.id}}{% endif %}">
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">회사명 <span style="color:red;">*</span></label>
+              <div class="layui-input-block">
+                <input type="text" id="company_name" name="company_name" value="{% if edit_group %}{{edit_group.company_name}}{% endif %}" lay-verify="required" placeholder="회사명을 입력하세요" autocomplete="off" class="layui-input">
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">사업자번호</label>
+              <div class="layui-input-block">
+                <input type="text" id="business_number" name="business_number" value="{% if edit_group %}{{edit_group.business_number}}{% endif %}" placeholder="사업자등록번호 (예: 123-45-67890)" autocomplete="off" class="layui-input">
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">대표자명</label>
+              <div class="layui-input-block">
+                <input type="text" id="representative" name="representative" value="{% if edit_group %}{{edit_group.representative}}{% endif %}" placeholder="대표자 이름" autocomplete="off" class="layui-input">
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">담당자 이름</label>
+              <div class="layui-input-block">
+                <input type="text" id="contact_name" name="contact_name" value="{% if edit_group %}{{edit_group.contact_name}}{% endif %}" placeholder="담당자 이름" autocomplete="off" class="layui-input">
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">담당자 전화</label>
+              <div class="layui-input-block">
+                <input type="tel" id="contact_phone" name="contact_phone" value="{% if edit_group %}{{edit_group.contact_phone}}{% endif %}" placeholder="담당자 전화번호 (예: 010-1234-5678)" autocomplete="off" class="layui-input">
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">담당자 이메일</label>
+              <div class="layui-input-block">
+                <input type="email" id="contact_email" name="contact_email" value="{% if edit_group %}{{edit_group.contact_email}}{% endif %}" placeholder="담당자 이메일" autocomplete="off" class="layui-input">
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">주소</label>
+              <div class="layui-input-block">
+                <input type="text" id="address" name="address" value="{% if edit_group %}{{edit_group.address}}{% endif %}" placeholder="주소 (예: 서울시 강남구 테헤란로 123)" autocomplete="off" class="layui-input">
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">상세주소</label>
+              <div class="layui-input-block">
+                <input type="text" id="address_detail" name="address_detail" value="{% if edit_group %}{{edit_group.address_detail}}{% endif %}" placeholder="상세주소 (예: 5층 501호)" autocomplete="off" class="layui-input">
+              </div>
+            </div>
+            
+            <div class="layui-form-item layui-form-text">
+              <label class="layui-form-label">메모</label>
+              <div class="layui-input-block">
+                <textarea id="memo" name="memo" placeholder="메모를 입력하세요" class="layui-textarea" style="min-height: 80px;">{% if edit_group %}{{edit_group.memo}}{% endif %}</textarea>
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <div class="layui-input-block">
+                <button type="submit" lay-submit lay-filter="saveGroup" class="layui-btn">
+                  <i class="layui-icon layui-icon-ok"></i> {% if edit_group %}수정{% else %}등록{% endif %}
+                </button>
+                {% if edit_group %}
+                <a href="/api/group_manage" class="layui-btn layui-btn-primary">
+                  <i class="layui-icon layui-icon-return"></i> 취소
+                </a>
+                {% else %}
+                <button type="reset" class="layui-btn layui-btn-primary">
+                  <i class="layui-icon layui-icon-refresh"></i> 초기화
+                </button>
+                {% endif %}
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 우측: 그룹 목록 -->
+    <div class="layui-col-md7">
+      <div class="layui-card">
+        <div class="layui-card-header">
+          <i class="layui-icon layui-icon-group"></i>
+          그룹 목록 (총 {{groups|length}}개)
+        </div>
+        <div class="layui-card-body" style="padding: 0;">
+          <table class="layui-table" lay-skin="line" style="margin: 0;">
+            <colgroup>
+              <col width="30%">
+              <col width="20%">
+              <col width="25%">
+              <col width="25%">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>회사명</th>
+                <th>담당자</th>
+                <th>연락처</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for group in groups %}
+              <tr>
+                <td>
+                  <strong>{{group.company_name}}</strong>
+                  {% if group.business_number %}
+                  <br><small style="color: #999;">{{group.business_number}}</small>
+                  {% endif %}
+                </td>
+                <td>{{group.contact_name|default:"-"}}</td>
+                <td>
+                  {% if group.contact_phone %}
+                  <i class="layui-icon layui-icon-cellphone" style="font-size: 14px;"></i> {{group.contact_phone}}
+                  {% endif %}
+                  {% if group.contact_email %}
+                  <br><small><i class="layui-icon layui-icon-email" style="font-size: 12px;"></i> {{group.contact_email}}</small>
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="/api/group_manage?edit={{group.id}}" class="layui-btn layui-btn-xs layui-btn-normal">
+                    <i class="layui-icon layui-icon-edit"></i> 수정
+                  </a>
+                  <button type="button" class="layui-btn layui-btn-xs layui-btn-danger" onclick="deleteGroup({{group.id}}, '{{group.company_name}}')">
+                    <i class="layui-icon layui-icon-delete"></i> 삭제
+                  </button>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="4" style="text-align: center; color: #999; padding: 40px;">
+                  <i class="layui-icon layui-icon-face-surprised" style="font-size: 40px;"></i>
+                  <br><br>등록된 그룹이 없습니다.<br>좌측에서 새 그룹을 등록해주세요.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      {% if groups %}
+      <!-- 그룹 상세 정보 카드 (선택된 그룹이 있을 때) -->
+      {% if edit_group %}
+      <div class="layui-card" style="margin-top: 15px;">
+        <div class="layui-card-header">
+          <i class="layui-icon layui-icon-about"></i>
+          상세 정보 - {{edit_group.company_name}}
+        </div>
+        <div class="layui-card-body">
+          <table class="layui-table" lay-skin="nob" style="margin: 0;">
+            <tr>
+              <td width="100" style="font-weight: bold;">사업자번호</td>
+              <td>{{edit_group.business_number|default:"-"}}</td>
+              <td width="100" style="font-weight: bold;">대표자명</td>
+              <td>{{edit_group.representative|default:"-"}}</td>
+            </tr>
+            <tr>
+              <td style="font-weight: bold;">주소</td>
+              <td colspan="3">
+                {{edit_group.address|default:"-"}}
+                {% if edit_group.address_detail %} {{edit_group.address_detail}}{% endif %}
+              </td>
+            </tr>
+            {% if edit_group.memo %}
+            <tr>
+              <td style="font-weight: bold;">메모</td>
+              <td colspan="3" style="white-space: pre-wrap;">{{edit_group.memo}}</td>
+            </tr>
+            {% endif %}
+            <tr>
+              <td style="font-weight: bold;">등록일</td>
+              <td>{{edit_group.create_time|date:"Y-m-d H:i"}}</td>
+              <td style="font-weight: bold;">수정일</td>
+              <td>{{edit_group.update_time|date:"Y-m-d H:i"}}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script type="text/javascript">
+    var isSubmitting = false;  // 중복 제출 방지 플래그
+    
+    layui.use(['form','jquery','layer'], function () {
+        var form   = layui.form;
+        var $      = layui.jquery;
+        var layer  = layui.layer;
+        
+        // 폼 제출
+        form.on('submit(saveGroup)', function(data) {
+            // 중복 제출 방지
+            if (isSubmitting) {
+                return false;
+            }
+            isSubmitting = true;
+            
+            // 버튼 비활성화
+            $('button[lay-filter="saveGroup"]').prop('disabled', true).addClass('layui-btn-disabled');
+            
+            $.ajax({
+                url: '/api/group_manage/save',
+                type: 'POST',
+                dataType: 'json',
+                data: {
+                    group_id: $('#group_id').val(),
+                    company_name: $('#company_name').val(),
+                    business_number: $('#business_number').val(),
+                    representative: $('#representative').val(),
+                    contact_name: $('#contact_name').val(),
+                    contact_phone: $('#contact_phone').val(),
+                    contact_email: $('#contact_email').val(),
+                    address: $('#address').val(),
+                    address_detail: $('#address_detail').val(),
+                    memo: $('#memo').val()
+                },
+                success: function(resp) {
+                    if (resp.code == 1) {
+                        layer.msg(resp.msg, {icon: 1, time: 1500}, function() {
+                            location.href = '/api/group_manage';
+                        });
+                    } else {
+                        layer.msg(resp.msg, {icon: 2});
+                        isSubmitting = false;
+                        $('button[lay-filter="saveGroup"]').prop('disabled', false).removeClass('layui-btn-disabled');
+                    }
+                },
+                error: function() {
+                    layer.msg('요청 중 오류가 발생했습니다.', {icon: 2});
+                    isSubmitting = false;
+                    $('button[lay-filter="saveGroup"]').prop('disabled', false).removeClass('layui-btn-disabled');
+                }
+            });
+            return false;
+        });
+    });
+    
+    // 그룹 삭제
+    function deleteGroup(groupId, companyName) {
+        layui.use('layer', function() {
+            var layer = layui.layer;
+            layer.confirm('<strong>' + companyName + '</strong> 그룹을 삭제하시겠습니까?<br><br><span style="color: #FF5722;">이 작업은 되돌릴 수 없습니다.</span>', {
+                title: '그룹 삭제 확인',
+                btn: ['삭제', '취소'],
+                btn1: function(index) {
+                    layui.jquery.ajax({
+                        url: '/api/group_manage/delete/' + groupId,
+                        type: 'POST',
+                        dataType: 'json',
+                        success: function(resp) {
+                            layer.close(index);
+                            if (resp.code == 1) {
+                                layer.msg(resp.msg, {icon: 1, time: 1500}, function() {
+                                    location.reload();
+                                });
+                            } else {
+                                layer.msg(resp.msg, {icon: 2});
+                            }
+                        },
+                        error: function() {
+                            layer.msg('삭제 요청 중 오류가 발생했습니다.', {icon: 2});
+                        }
+                    });
+                }
+            });
+        });
+    }
+</script>
+{% endblock %}
+

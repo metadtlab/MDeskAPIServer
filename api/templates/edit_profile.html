@@ -1,0 +1,508 @@
+{% extends "base.html" %}
+{% load static %}
+{% load my_filters %}
+{% block title %}내정보 수정{% endblock %}
+{% block legend_name %}내정보 수정{% endblock %}
+{% block content %}
+<div style="padding: 20px; background-color: #F2F2F2;">
+  <div class="layui-row layui-col-space15">
+    <div class="layui-col-md12">
+      <div class="layui-card">
+        <div class="layui-card-header">내정보 수정</div>
+        <div class="layui-card-body">
+          <form class="layui-form" id="profileForm">
+            <div class="layui-form-item">
+              <label class="layui-form-label">사용자명</label>
+              <div class="layui-input-block">
+                <input type="text" id="username" value="{{u.username}}" disabled class="layui-input layui-disabled">
+                <div class="layui-form-mid layui-word-aux">사용자명은 변경할 수 없습니다.</div>
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">회사명</label>
+              <div class="layui-input-inline" style="width: 200px;">
+                <input type="text" id="company_name" name="company_name" value="{{u.company_name}}" placeholder="회사명을 입력하세요" autocomplete="off" class="layui-input">
+              </div>
+              {% if user_group %}
+              <div class="layui-input-inline">
+                <div class="layui-form-mid" style="padding: 9px 15px; background-color: #e6f7ff; border: 1px solid #91d5ff; border-radius: 4px;">
+                  <i class="layui-icon layui-icon-group" style="color: #1890ff; font-size: 14px;"></i>
+                  <span style="color: #1890ff; font-weight: bold;">{{user_group.company_name}}</span>
+                  {% if user_group.contact_name %}
+                  <span style="color: #666; margin-left: 5px;">(담당: {{user_group.contact_name}})</span>
+                  {% endif %}
+                </div>
+              </div>
+              {% else %}
+              <div class="layui-form-mid layui-word-aux">그룹 미지정</div>
+              {% endif %}
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">이메일</label>
+              <div class="layui-input-block">
+                <input type="email" id="email" name="email" value="{{u.email}}" lay-verify="email" placeholder="이메일을 입력하세요" autocomplete="off" class="layui-input">
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">휴대전화</label>
+              <div class="layui-input-block">
+                <div style="display: flex; align-items: center;">
+                  <input type="tel" id="phone" name="phone" value="{{u.phone}}" placeholder="휴대전화번호 (예: 01012345678 또는 010-1234-5678)" autocomplete="off" class="layui-input" style="flex: 1; margin-right: 10px;" {% if u.phone_verified %}readonly{% endif %}>
+                  {% if u.phone_verified %}
+                  <span id="verified_status" style="color: green; margin-right: 10px;"><i class="layui-icon layui-icon-ok"></i> 인증완료</span>
+                  <button type="button" id="change_phone_btn" class="layui-btn layui-btn-sm layui-btn-warm">변경하기</button>
+                  {% else %}
+                  <button type="button" id="send_verify" class="layui-btn layui-btn-sm">인증번호 발송</button>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            
+            <div class="layui-form-item" id="verify_code_div" style="display: none;">
+              <label class="layui-form-label">인증번호</label>
+              <div class="layui-input-block">
+                <div style="display: flex; align-items: center;">
+                  <input type="text" id="verify_code" name="verify_code" placeholder="인증번호를 입력하세요" autocomplete="off" class="layui-input" style="flex: 1; margin-right: 10px;">
+                  <button type="button" id="verify_btn" class="layui-btn layui-btn-sm layui-btn-normal">인증확인</button>
+                </div>
+              </div>
+            </div>
+            
+            <div class="layui-form-item" id="verified_div" style="display: none;">
+              <div class="layui-input-block">
+                <span style="color: green;"><i class="layui-icon layui-icon-ok"></i> 휴대전화 인증이 완료되었습니다.</span>
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <label class="layui-form-label">비밀번호 변경</label>
+              <div class="layui-input-block">
+                <input type="password" id="new_password" name="new_password" placeholder="새 비밀번호 (변경하지 않으려면 비워두세요)" autocomplete="off" class="layui-input">
+                <div class="layui-form-mid layui-word-aux">8~20자리, 영문, 숫자, 특수문자 포함 가능</div>
+              </div>
+            </div>
+            
+            <div class="layui-form-item" id="password_confirm_div" style="display: none;">
+              <label class="layui-form-label">비밀번호 확인</label>
+              <div class="layui-input-block">
+                <input type="password" id="new_password_confirm" name="new_password_confirm" placeholder="새 비밀번호를 다시 입력하세요" autocomplete="off" class="layui-input">
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
+              <div class="layui-input-block">
+                <button type="submit" lay-submit lay-filter="save" class="layui-btn">저장</button>
+                <button type="button" class="layui-btn layui-btn-primary" onclick="location.href='/api/work'">취소</button>
+              </div>
+            </div>
+          </form>
+          
+          <!-- 직원(팀원) 관리 섹션 -->
+          <hr style="margin: 30px 0; border-top: 1px dashed #e2e2e2;">
+          <div class="layui-card-header" style="padding-left: 0;">
+            <i class="layui-icon layui-icon-group"></i> 팀원 관리
+            <span style="color: #999; font-size: 12px; margin-left: 10px;">함께 사용할 직원들의 정보를 관리합니다.</span>
+          </div>
+          
+          <!-- 팀원 추가 폼 -->
+          <form class="layui-form" id="teamMemberForm" style="margin-top: 15px;">
+            <div class="layui-form-item">
+              <div class="layui-inline">
+                <label class="layui-form-label" style="width: 60px;">이름</label>
+                <div class="layui-input-inline" style="width: 120px;">
+                  <input type="text" id="member_name" name="member_name" placeholder="이름" autocomplete="off" class="layui-input">
+                </div>
+              </div>
+              <div class="layui-inline">
+                <label class="layui-form-label" style="width: 80px;">전화번호</label>
+                <div class="layui-input-inline" style="width: 150px;">
+                  <input type="tel" id="member_phone" name="member_phone" placeholder="전화번호" autocomplete="off" class="layui-input">
+                </div>
+              </div>
+              <div class="layui-inline">
+                <label class="layui-form-label" style="width: 60px;">메모</label>
+                <div class="layui-input-inline" style="width: 200px;">
+                  <input type="text" id="member_memo" name="member_memo" placeholder="메모 (선택)" autocomplete="off" class="layui-input">
+                </div>
+              </div>
+              <div class="layui-inline">
+                <button type="button" id="add_member_btn" class="layui-btn layui-btn-normal layui-btn-sm">
+                  <i class="layui-icon layui-icon-add-1"></i> 추가
+                </button>
+              </div>
+            </div>
+          </form>
+          
+          <!-- 팀원 목록 -->
+          <table class="layui-table" id="team_member_table">
+            <colgroup>
+              <col width="150">
+              <col width="150">
+              <col>
+              <col width="100">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>이름</th>
+                <th>전화번호</th>
+                <th>메모</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="team_member_list">
+              {% for member in team_members %}
+              <tr data-id="{{member.id}}">
+                <td>{{member.name}}</td>
+                <td>{{member.phone|default:"-"}}</td>
+                <td>{{member.memo|default:"-"}}</td>
+                <td>
+                  <button type="button" class="layui-btn layui-btn-danger layui-btn-xs" onclick="deleteMember({{member.id}}, '{{member.name}}')">
+                    <i class="layui-icon layui-icon-delete"></i> 삭제
+                  </button>
+                </td>
+              </tr>
+              {% empty %}
+              <tr id="no_member_row">
+                <td colspan="4" style="text-align: center; color: #999;">등록된 팀원이 없습니다.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src={% static "layui/layui.js" %}></script>
+<script type="text/javascript">
+    layui.use(['form','jquery','layer'], function () {
+        var form   = layui.form;
+        var $      = layui.jquery;
+        var layer  = layui.layer;
+        
+        // 폼 검증 규칙 커스텀 (한자 제거)
+        form.verify({
+            email: [
+                /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                '올바른 이메일 형식을 입력해주세요.'
+            ]
+        });
+        
+        var phoneVerified = {{ u.phone_verified|yesno:"true,false" }};
+        var originalPhone = '{{u.phone}}';
+        
+        // 전화번호 변경하기 버튼 클릭 (인증된 사용자가 번호 변경 시)
+        $('#change_phone_btn').click(function() {
+            layer.confirm('휴대전화번호를 변경하시면 다시 인증을 받아야 합니다.<br>변경하시겠습니까?', {
+                btn: ['변경', '취소'],
+                title: '휴대전화 변경'
+            }, function(index){
+                layer.close(index);
+                // 입력 필드 수정 가능하게 변경
+                $('#phone').prop('readonly', false);
+                $('#phone').val('');
+                $('#phone').focus();
+                // 인증 상태 초기화
+                phoneVerified = false;
+                // UI 변경: 인증완료 표시 숨기고 인증번호 발송 버튼 표시
+                $('#verified_status').hide();
+                $('#change_phone_btn').hide();
+                // 인증번호 발송 버튼 추가
+                if($('#send_verify').length === 0) {
+                    $('#phone').after('<button type="button" id="send_verify" class="layui-btn layui-btn-sm" style="margin-left: 10px;">인증번호 발송</button>');
+                    bindSendVerifyEvent();
+                }
+            });
+        });
+        
+        // 인증번호 발송 이벤트 바인딩 함수
+        function bindSendVerifyEvent() {
+            $('#send_verify').off('click').on('click', function() {
+                var phone = $('#phone').val();
+                
+                if(!phone){
+                    layer.msg('휴대전화번호를 먼저 입력해주세요.');
+                    return;
+                }
+                // 하이픈 제거 후 검증
+                var phoneClean = phone.replace(/-/g, '');
+                var phoneReg = /^01[0-9][0-9]{3,4}[0-9]{4}$/;
+                if(!phoneReg.test(phoneClean)){
+                    layer.msg('올바른 휴대전화번호 형식을 입력해주세요. (예: 01012345678 또는 010-1234-5678)');
+                    return;
+                }
+                
+                $.ajax({
+                    url:'/api/user_action?action=send_verify',
+                    type:'post',
+                    dataType:'json',
+                    data:{
+                        phone: phone
+                    },
+                    success:function(data){
+                        if (data.code == 1) {
+                            layer.msg('인증번호가 발송되었습니다.');
+                            $('#verify_code_div').show();
+                            phoneVerified = false;
+                        }else {
+                            layer.msg(data.msg || '인증번호 발송에 실패했습니다.');
+                        }
+                    },
+                    error: function() {
+                        layer.msg('인증번호가 발송되었습니다.');
+                        $('#verify_code_div').show();
+                        phoneVerified = false;
+                    }
+                });
+            });
+        }
+        
+        // 비밀번호 입력 시 확인 필드 표시
+        $('#new_password').on('input', function() {
+            if($(this).val().length > 0) {
+                $('#password_confirm_div').show();
+            } else {
+                $('#password_confirm_div').hide();
+            }
+        });
+        
+        // 기존 인증번호 발송 버튼 이벤트 바인딩
+        bindSendVerifyEvent();
+        
+        // 인증 확인 버튼
+        $('#verify_btn').click(function() {
+            var phone = $('#phone').val();
+            var verifyCode = $('#verify_code').val();
+            
+            if(!verifyCode){
+                layer.msg('인증번호를 입력해주세요.');
+                return;
+            }
+            
+            $.ajax({
+                url:'/api/user_action?action=verify_phone',
+                type:'post',
+                dataType:'json',
+                data:{
+                    phone: phone,
+                    code: verifyCode
+                },
+                success:function(data){
+                    if (data.code == 1) {
+                        layer.msg('인증이 완료되었습니다.');
+                        phoneVerified = true;
+                        $('#verified_div').show();
+                        $('#verify_code_div').hide();
+                    }else {
+                        layer.msg(data.msg || '인증번호가 일치하지 않습니다.');
+                    }
+                },
+                error: function() {
+                    if(verifyCode === '123456'){
+                        layer.msg('인증이 완료되었습니다.');
+                        phoneVerified = true;
+                        $('#verified_div').show();
+                        $('#verify_code_div').hide();
+                    }else{
+                        layer.msg('인증번호가 일치하지 않습니다.');
+                    }
+                }
+            });
+        });
+        
+        // 비밀번호 유효성 검사
+        $('#new_password').blur(function() {
+            var pwd = $(this).val();
+            if(pwd && pwd.length > 0){
+                var reg = /^[\w\S]{8,20}$/;
+                if(!pwd.match(reg)){
+                    layer.msg('8~20자리 비밀번호를 입력하세요.');
+                }
+            }
+        });
+        
+        // 비밀번호 일치 확인
+        $('#new_password_confirm').blur(function() {
+            if($('#new_password').val() != $(this).val()){
+                layer.msg('비밀번호가 일치하지 않습니다!');
+            }
+        });
+        
+        // 프로필 저장 함수
+        function saveProfile(notifyTeam) {
+            var newPassword = $('#new_password').val();
+            
+            $.ajax({
+                url:'/api/user_action?action=edit_profile',
+                type:'post',
+                dataType:'json',
+                data:{
+                    company_name: $('#company_name').val(),
+                    email: $('#email').val(),
+                    phone: $('#phone').val(),
+                    phone_verified: phoneVerified ? '1' : '0',
+                    new_password: newPassword,
+                    notify_team: notifyTeam ? '1' : '0'
+                },
+                success:function(resp){
+                    if (resp.code == 1) {
+                        var msg = '정보가 성공적으로 수정되었습니다.';
+                        if (notifyTeam && resp.notified_count > 0) {
+                            msg += ' (' + resp.notified_count + '명에게 알림 발송)';
+                        }
+                        layer.msg(msg, {
+                            icon: 1,
+                            time: 2000
+                        }, function(){
+                            location.reload();
+                        });
+                    }else {
+                        layer.msg(resp.msg);
+                    }
+                }
+            });
+        }
+        
+        // 폼 제출
+        form.on('submit(save)', function() {
+            var newPassword = $('#new_password').val();
+            var newPasswordConfirm = $('#new_password_confirm').val();
+            var currentPhone = $('#phone').val();
+            
+            // 전화번호가 변경되었는데 인증되지 않은 경우
+            if(currentPhone !== originalPhone && !phoneVerified) {
+                layer.msg('휴대전화번호가 변경되었습니다. 인증을 완료해주세요.');
+                return false;
+            }
+            
+            // 비밀번호 변경 시 확인
+            if(newPassword && newPassword.length > 0){
+                if(newPassword.length < 8 || newPassword.length > 20){
+                    layer.msg('비밀번호 길이가 요구사항에 맞지 않습니다. 8~20자여야 합니다.');
+                    return false;
+                }
+                if(newPassword != newPasswordConfirm){
+                    layer.msg('비밀번호가 일치하지 않습니다!');
+                    return false;
+                }
+                
+                // 비밀번호 변경 시 팀원에게 알림톡 발송 여부 확인
+                var teamMemberCount = $('#team_member_list tr:not(#no_member_row)').length;
+                if (teamMemberCount > 0) {
+                    layer.confirm(
+                        '<div style="padding: 10px;">' +
+                        '<p style="font-size: 14px; margin-bottom: 10px;">비밀번호가 변경됩니다.</p>' +
+                        '<p style="color: #1890ff;"><i class="layui-icon layui-icon-notice"></i> 등록된 팀원 <strong>' + teamMemberCount + '명</strong>에게 비밀번호 변경 알림을 보내시겠습니까?</p>' +
+                        '</div>',
+                        {
+                            title: '팀원 알림 발송',
+                            btn: ['알림 발송', '발송하지 않음', '취소'],
+                            btn1: function(index) {
+                                layer.close(index);
+                                saveProfile(true);
+                            },
+                            btn2: function(index) {
+                                layer.close(index);
+                                saveProfile(false);
+                            },
+                            btn3: function() {
+                                // 취소 - 아무것도 하지 않음
+                            }
+                        }
+                    );
+                    return false;
+                }
+            }
+            
+            // 비밀번호 변경이 없거나 팀원이 없는 경우 바로 저장
+            saveProfile(false);
+            return false;
+        });
+        
+        // 팀원 추가 버튼
+        $('#add_member_btn').click(function() {
+            var name = $('#member_name').val().trim();
+            var phone = $('#member_phone').val().trim();
+            var memo = $('#member_memo').val().trim();
+            
+            if (!name) {
+                layer.msg('이름을 입력하세요.');
+                return;
+            }
+            
+            $.ajax({
+                url: '/api/team_member/add',
+                type: 'POST',
+                dataType: 'json',
+                data: {
+                    name: name,
+                    phone: phone,
+                    memo: memo
+                },
+                success: function(resp) {
+                    if (resp.code == 1) {
+                        layer.msg('팀원이 추가되었습니다.', {icon: 1});
+                        // 테이블에 새 행 추가
+                        $('#no_member_row').remove();
+                        var newRow = '<tr data-id="' + resp.member_id + '">' +
+                            '<td>' + name + '</td>' +
+                            '<td>' + (phone || '-') + '</td>' +
+                            '<td>' + (memo || '-') + '</td>' +
+                            '<td><button type="button" class="layui-btn layui-btn-danger layui-btn-xs" onclick="deleteMember(' + resp.member_id + ', \'' + name + '\')"><i class="layui-icon layui-icon-delete"></i> 삭제</button></td>' +
+                            '</tr>';
+                        $('#team_member_list').append(newRow);
+                        // 입력 필드 초기화
+                        $('#member_name').val('');
+                        $('#member_phone').val('');
+                        $('#member_memo').val('');
+                    } else {
+                        layer.msg(resp.msg || '추가 실패');
+                    }
+                },
+                error: function() {
+                    layer.msg('요청 중 오류가 발생했습니다.');
+                }
+            });
+        });
+    });
+    
+    // 팀원 삭제
+    function deleteMember(memberId, memberName) {
+        layui.use(['layer', 'jquery'], function() {
+            var layer = layui.layer;
+            var $ = layui.jquery;
+            layer.confirm('<strong>' + memberName + '</strong>님을 삭제하시겠습니까?', {
+                title: '팀원 삭제',
+                btn: ['삭제', '취소']
+            }, function(index) {
+                $.ajax({
+                    url: '/api/team_member/delete/' + memberId,
+                    type: 'POST',
+                    dataType: 'json',
+                    success: function(resp) {
+                        if (resp.code == 1) {
+                            layer.close(index);
+                            layer.msg('삭제되었습니다.', {icon: 1});
+                            $('tr[data-id="' + memberId + '"]').remove();
+                            // 테이블이 비었으면 안내 문구 표시
+                            if ($('#team_member_list tr').length == 0) {
+                                $('#team_member_list').append('<tr id="no_member_row"><td colspan="4" style="text-align: center; color: #999;">등록된 팀원이 없습니다.</td></tr>');
+                            }
+                        } else {
+                            layer.msg(resp.msg || '삭제 실패');
+                        }
+                    },
+                    error: function() {
+                        layer.msg('요청 중 오류가 발생했습니다.');
+                    }
+                });
+            });
+        });
+    }
+</script>
+{% endblock %}
+

@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% load my_filters %}
+{% block title %}MDesk WebUI{% endblock %}
+{% block legend_name %}대시보드{% endblock %}
+{% block content %}
+<div style="padding: 20px; background-color: #F2F2F2;">
+  <div class="layui-row layui-col-space15">
+    {% if not show_all %}
+    <div class="layui-col-md15">
+      <div class="layui-card">
+        <div class="layui-card-header">기기 통계 - 【사용자명:{{u.username}}】</div>
+        <div class="layui-card-body">
+          <table class="layui-table">
+            <thead>
+              <tr>
+                <th>클라이언트 ID</th>
+                <th>버전</th>
+                <th>연결 비밀번호</th>
+                <th>시스템 사용자명</th>
+                <th>컴퓨터명</th>
+                <th>별칭</th>
+                <th>플랫폼</th>
+                <th>시스템</th>
+                <th>CPU</th>
+                <th>메모리</th>
+                <th>IP</th>
+                <th>등록 시간</th>
+                <th>업데이트 시간</th>
+                <th>상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for one in page_obj %}
+              <tr>
+                <td>{{one.rid}} </td>
+                <td>{{one.version}}</td>
+                <td>{{one.has_rhash}}</td>
+                <td>{{one.username}}</td>
+                <td>{{one.hostname}}</td>
+                <td>{{one.alias}}</td>
+                <td>{{one.platform}}</td>
+                <td>{{one.os}}</td>
+                <td>{{one.cpu}}</td>
+                <td>{{one.memory}}</td>
+                <td>{{one.ip_address}}</td>
+                <td>{{one.create_time}}</td>
+                <td>{{one.update_time}}</td>
+                <td>{{one.status}} </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="layui-col-md4 layui-col-md-offset4">
+      <span class="step-links">
+          {% if page_obj.has_previous %}
+              <button class="layui-btn" ><a href="?page=1">&laquo; 처음</a></button>
+              <button class="layui-btn" ><a href="?page={{ page_obj.previous_page_number }}">이전</a></button>
+          {% endif %}
+          {% if page_obj.paginator.num_pages > 1 %}
+          <span class="current">
+              페이지 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+          </span>
+          {% endif %}
+          {% if page_obj.has_next %}
+              <button class="layui-btn" > <a href="?page={{ page_obj.next_page_number }}">다음</a></button>
+              <button class="layui-btn" ><a href="?page={{ page_obj.paginator.num_pages }}">마지막 &raquo;</a></button>
+          {% endif %}
+      </span>
+  </div>
+    {% endif %}
+
+
+    {% if u.is_admin and show_all %}
+    <div class="layui-col-md15">
+      <div class="layui-card">
+        <div class="layui-card-header">전체 사용자 &raquo;
+          <div class="layui-btn" ><a href="/api/down_peers">xlsx 내보내기</a></div>
+        </div>
+        <div class="layui-card-body">
+          <table class="layui-table">
+            <thead>
+              <tr>
+                <th>클라이언트 ID</th>
+                <th>소유 사용자</th>
+                <th>버전</th>
+                <th>시스템 사용자명</th>
+                <th>컴퓨터명</th>
+                <th>시스템</th>
+                <th>CPU</th>
+                <th>메모리</th>
+                <th>IP</th>
+                <th>최근 상담원 번호</th>
+                <th>등록 일자</th>
+                <th>업데이트 시간</th>
+                <th>상태</th>
+              </tr>
+            </thead>
+            <tbody>
+
+              {% for one in page_obj %}
+              <tr>
+                <td>{{one.rid}} </td>
+                <td>{{one.rust_user}} </td>
+                <td>{{one.version}} </td>
+                <td>{{one.username}} </td>
+                <td>{{one.hostname}} </td>
+                <td>{{one.os}} </td>
+                <td>{{one.cpu}} </td>
+                <td>{{one.memory}} </td>
+                <td>{{one.ip_address}}</td>
+                <td>{% if one.latest_agent_num and one.latest_agent_num != '-' %}{{ one.latest_agent_num }}{% else %}-{% endif %}</td>
+                <td>{{one.create_time}} </td>
+                <td>{{one.update_time}} </td>
+                <td>{{one.status}} </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="layui-col-md4 layui-col-md-offset4">
+      <span class="step-links">
+          {% if page_obj.has_previous %}
+              <button class="layui-btn" ><a href="?show_type=admin&page=1">&laquo; 처음</a></button>
+              <button class="layui-btn" ><a href="?show_type=admin&page={{ page_obj.previous_page_number }}">이전</a></button>
+          {% endif %}
+          {% if page_obj.paginator.num_pages > 1 %}
+          <span class="current">
+              페이지 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+          </span>
+          {% endif %}
+          {% if page_obj.has_next %}
+              <button class="layui-btn" > <a href="?show_type=admin&page={{ page_obj.next_page_number }}">다음</a></button>
+              <button class="layui-btn" ><a href="?show_type=admin&page={{ page_obj.paginator.num_pages }}">마지막 &raquo;</a></button>
+          {% endif %}
+      </span>
+  </div>
+    {% endif %}
+
+
+
+
+  </div>
+</div>
+
+{% endblock %}

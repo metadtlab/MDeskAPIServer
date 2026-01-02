@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% load my_filters %}
+{% block title %}{{title}}{% endblock %}
+{% block legend_name %}정보{% endblock %}
+{% block content %} 
+<div style="padding: 20px; background-color: #F2F2F2;">
+  <div class="layui-row layui-col-space15">
+{% autoescape off %}
+    {{msg}}
+ {% endautoescape %}
+</div></div>
+
+{% endblock %}

@@ -1,0 +1,8 @@
+django
+xlwt
+mysqlclient
+psycopg2-binary
+Pillow
+requests
+python-dotenv
+pefile

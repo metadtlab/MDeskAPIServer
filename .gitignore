@@ -1,0 +1,43 @@
+# Python
+*.pyc
+*.pyo
+*.spec
+*.c
+*.pyd
+*.so
+test.py
+__pycache__
+
+# Documents
+test
+
+
+# Files
+*.bat
+server.ico
+start.py
+
+# Build
+build
+dist
+dist-
+dist_py38
+
+LICENSE.rst
+
+db/test_db.sqlite3
+job2en.py
+
+新建文本文档.txt
+
+# GitHub workflows (workflow scope required for PAT)
+.github/
+
+# Docker images
+rustdesk_image.tar
+*.tar
+
+# Environment files (민감한 정보 포함)
+.env
+.env.local
+.env.production

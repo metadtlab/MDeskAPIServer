@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load my_filters %}
+{% block title %}MDesk WebUI{% endblock %}
+{% block content %}
+<div style="padding: 20px; background-color: #F2F2F2;">
+  <div class="layui-row layui-col-space15">
+    <div class="layui-col-md15">
+      <div class="layui-card">
+        <div class="layui-card-header">파일 전송 로그:【{{u.username}}】</div>
+        <div class="layui-card-body">
+          <table class="layui-table">
+            <thead>
+              <tr>
+                <th>파일</th>
+                <th>원격 ID</th>
+                <th>원격 별칭</th>
+                <th>사용자 ID</th>
+                <th>사용자 별칭</th>
+                <th>사용자 IP</th>
+                <th>파일 크기</th>
+                <th>전송/수신</th>
+                <th>기록 시간</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for one in page_obj %}
+              <tr>
+                <td>{{one.file}}</td>
+                <td>{{one.remote_id}} </td>
+                <td>{{one.remote_alias}}</td>
+                <td>{{one.user_id}}</td>
+                <td>{{one.user_alias}}</td>
+                <td>{{one.user_ip}}</td>
+                <td>{{one.filesize}}</td>
+                {% if one.direction == 0 %}
+                <td>파일 수신</td>
+                {% else %}
+                <td>파일 전송</td>
+                {% endif %}
+                <td>{{one.logged_at}}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="layui-col-md4 layui-col-md-offset4">
+      <span class="step-links">
+          {% if page_obj.has_previous %}
+              <button class="layui-btn" ><a href="?page=1">&laquo; 처음</a></button>
+              <button class="layui-btn" ><a href="?page={{ page_obj.previous_page_number }}">이전</a></button>
+          {% endif %}
+          {% if page_obj.paginator.num_pages > 1 %}
+          <span class="current">
+              페이지 # {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+          </span>
+          {% endif %}
+          {% if page_obj.has_next %}
+              <button class="layui-btn" > <a href="?page={{ page_obj.next_page_number }}">다음</a></button>
+              <button class="layui-btn" ><a href="?page={{ page_obj.paginator.num_pages }}">마지막 &raquo;</a></button>
+          {% endif %}
+      </span>
+  </div>  
+  </div>
+</div>
+
+{% endblock %}
