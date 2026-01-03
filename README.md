@@ -23,12 +23,41 @@
 프로젝트 루트의 `env_config.txt`를 `.env`로 이름을 변경하고 환경에 맞게 수정합니다.
 
 ```env
-HOST_PORT=80
-ID_SERVER=admin.787.kr
-CSRF_TRUSTED_ORIGINS=https://787.kr,https://admin.787.kr,http://787.kr
+
+# ============== 기본설정 ============== 
+HOST=0.0.0.0 
+TZ=Asia/Seoul 
+ 
+# ============== Django 설정 ============== 
+SECRET_KEY=너꺼 키
+DEBUG=False
+LANGUAGE_CODE=ko
+ALLOW_REGISTRATION=True
+ID_SERVER=도메인주소 만드세요
+CSRF_TRUSTED_ORIGINS=도메인주소 만드세요,도메인주소 만드세요,도메인주소 만드세요,도메인주소 만드세요 형식
+ 
+# ============== 데이터베이스 설정 ============== 
 DATABASE_TYPE=POSTGRESQL
-POSTGRES_HOST=your_db_host
-POSTGRES_PASSWORD='your_password'
+POSTGRES_DBNAME=
+POSTGRES_HOST=
+POSTGRES_USER=
+POSTGRES_PASSWORD=
+POSTGRES_PORT=5432
+ 
+# ============== 이메일설정 ============== 
+EMAIL_HOST=smtp.gmail.com 
+EMAIL_PORT=587 
+EMAIL_USE_TLS=True 
+EMAIL_HOST_USER=
+EMAIL_HOST_PASSWORD=
+DEFAULT_FROM_EMAIL=
+ 
+# ============== 카카오알림톡 설정(옵션) ============== 
+KAKAO_ALIMTALK_API_URL=비즈톡API 추천드려요(기업만가능한걸로알고있음)
+KAKAO_ALIMTALK_ID=
+KAKAO_ALIMTALK_PW=
+KAKAO_ALIMTALK_TEM_NUM=카카오비즈니스 키받아서 올리시고
+KAKAO_ALIMTALK_SEND_NUM=발신번호
 ```
 
 ### 2. 도커 배포 (Windows)
