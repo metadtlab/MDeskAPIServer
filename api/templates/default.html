@@ -119,6 +119,38 @@
             text-decoration: underline;
         }
 
+        .btn-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .download-btn.free {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        .download-btn.free:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(40, 167, 69, 0.4);
+        }
+
+        .download-btn.paid {
+            background: linear-gradient(135deg, #fd7e14 0%, #e83e8c 100%);
+        }
+
+        .download-btn.paid:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(253, 126, 20, 0.4);
+        }
+
+        .btn-label {
+            display: block;
+            font-size: 12px;
+            opacity: 0.9;
+            margin-top: 2px;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 40px 30px;
@@ -136,6 +168,83 @@
                 font-size: 18px;
                 padding: 15px 30px;
             }
+
+            .btn-container {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+
+        /* 다운로드 안내 애니메이션 */
+        .download-guide {
+            display: none;
+            position: fixed;
+            top: 20px;
+            right: 80px;
+            z-index: 9999;
+            animation: bounceArrow 1s ease-in-out infinite;
+        }
+
+        .download-guide.show {
+            display: block;
+        }
+
+        .download-guide-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #ff6b6b;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 30px;
+            box-shadow: 0 10px 40px rgba(255, 107, 107, 0.5);
+            font-weight: 700;
+            font-size: 16px;
+        }
+
+        .download-guide-arrow {
+            font-size: 28px;
+            animation: pointRight 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes bounceArrow {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        @keyframes pointRight {
+            from {
+                transform: translateX(0);
+            }
+            to {
+                transform: translateX(10px);
+            }
+        }
+
+        .download-guide-close {
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            width: 24px;
+            height: 24px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .download-guide-close:hover {
+            background: #555;
         }
     </style>
 </head>
@@ -147,24 +256,49 @@
             안전하고 빠른 원격 데스크톱 제어 솔루션<br>
             지금 바로 다운로드하여 시작하세요
         </p>
-        <a href="#" class="download-btn" onclick="downloadApp(); return false;">
-            <svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-            다운로드
-        </a>
+        <div class="btn-container">
+            <a href="#" class="download-btn free" onclick="downloadFree(); return false;">
+                <svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                클라이언트 다운로드
+            </a>
+        </div>
         <div class="info-text">
             관리자 페이지는 <strong>{{ domain }}</strong>에서 이용하실 수 있습니다.<br>
             문의사항이 있으시면 관리자에게 연락해주세요.
         </div>
     </div>
 
+    <!-- 다운로드 안내 -->
+    <div class="download-guide" id="downloadGuide">
+        <button class="download-guide-close" onclick="hideDownloadGuide()">✕</button>
+        <div class="download-guide-content">
+            <span>다운받은 파일을 클릭하세요!</span>
+            <span class="download-guide-arrow">👆</span>
+        </div>
+    </div>
+
     <script>
-        function downloadApp() {
-            // 직접 다운로드 URL로 이동
-            window.location.href = '/download';
+        function downloadFree() {
+            // MDesk 클라이언트 다운로드
+            window.location.href = '/api/download/imedix';
+            
+            // 다운로드 안내 표시 (1초 후)
+            setTimeout(function() {
+                document.getElementById('downloadGuide').classList.add('show');
+            }, 1000);
+            
+            // 10초 후 자동 숨김
+            setTimeout(function() {
+                hideDownloadGuide();
+            }, 10000);
+        }
+        
+        function hideDownloadGuide() {
+            document.getElementById('downloadGuide').classList.remove('show');
         }
     </script>
 </body>

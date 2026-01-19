@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.db.models import Q
 from django.contrib.auth.decorators import login_required
 from django.contrib import auth
-from api.models import RustDeskPeer, RustDesDevice, UserProfile, ShareLink, ConnLog, FileLog, CustomAppConfig, SupportAgent, AgentConnectionLog, Group
+from api.models import RustDeskPeer, RustDesDevice, UserProfile, ShareLink, ConnLog, FileLog, CustomAppConfig, SupportAgent, AgentConnectionLog, Group, RelayServer, RustDeskToken
 from django.forms.models import model_to_dict
 from django.core.paginator import Paginator
 from django.http import HttpResponse
@@ -38,6 +38,77 @@ import requests
 
 salt = 'xiaomo'
 EFFECTIVE_SECONDS = 7200
+
+def send_kakao_password_notification(phone, username, new_password, company_name=''):
+    """
+    카카오 알림톡을 통해 비밀번호 변경 알림 발송 (일괄 암호변경용)
+    
+    기존 send_password_change_notification 함수와 동일한 API 사용
+    템플릿 코드: MDTL04
+    
+    Args:
+        phone: 수신자 전화번호
+        username: 사용자명
+        new_password: 새 비밀번호 (현재 템플릿에서는 사용 안함)
+        company_name: 회사명 (현재 템플릿에서는 사용 안함)
+    
+    Returns:
+        bool: 발송 성공 여부
+    """
+    import json as json_module
+    
+    if not phone:
+        return False
+    
+    # 전화번호 정규화 (하이픈, 공백 제거)
+    phone = phone.replace('-', '').replace(' ', '').strip()
+    
+    # 카카오 알림톡 API URL 확인
+    api_url = getattr(settings, 'KAKAO_ALIMTALK_API_URL', '')
+    if not api_url:
+        print(f"[카카오 알림톡] API URL이 설정되지 않았습니다. (테스트 모드 - 수신: {phone}, 사용자: {username})")
+        return True  # 테스트 모드에서는 성공으로 처리
+    
+    # 카카오 알림톡 API 요청 데이터 구성
+    data = {
+        "titleinfo": {
+            "id": getattr(settings, 'KAKAO_ALIMTALK_ID', ''),
+            "pw": getattr(settings, 'KAKAO_ALIMTALK_PW', ''),
+            "temNum": getattr(settings, 'KAKAO_ALIMTALK_TEM_NUM', '')
+        },
+        "messageList": [
+            {
+                "rcvNum": phone,
+                "title": "",
+                "btnURL1": "",
+                "msg": """원격솔루션 MDesk "비밀번호"가 변경되었습니다.
+팀원분들은 관리자에게 변경된 "비밀번호"를 문의 바랍니다.""",
+                "ptno": "",
+                "rcvDate": "",
+                "rcvTime": "",
+                "msgtype": "KKO",
+                "sendNum": getattr(settings, 'KAKAO_ALIMTALK_SEND_NUM', ''),
+                "temCode": "MDTL04"
+            }
+        ]
+    }
+    
+    try:
+        # JSON 문자열로 변환 후 MSG 키에 담아서 POST 전송
+        json_data = json_module.dumps(data, ensure_ascii=False)
+        print(f"[카카오 알림톡] 발송 시도 - {username}({phone})")
+        
+        response = requests.post(
+            api_url, 
+            data={'MSG': json_data},
+            headers={'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'},
+            timeout=10
+        )
+        print(f"[카카오 알림톡] 발송 결과: {username}({phone}) - {response.text}")
+        return True
+    except Exception as e:
+        print(f"[카카오 알림톡] 발송 오류: {str(e)}")
+        return False
 
 
 def getStrMd5(s):
@@ -142,6 +213,8 @@ def user_action(request):
         return user_register(request)
     elif action == 'logout':
         return user_logout(request)
+    elif action == 'check_phone':
+        return check_phone_duplicate(request)
     elif action == 'send_verify':
         return send_verify_code(request)
     elif action == 'verify_phone':
@@ -429,6 +502,45 @@ def send_reset_password_email(email, reset_token, reset_url):
     except Exception as e:
         print(f'이메일 발송 오류: {str(e)}')
         return False
+
+
+def check_phone_duplicate(request):
+    """전화번호 중복 확인"""
+    result = {
+        'code': 1,
+        'msg': ''
+    }
+    
+    if request.method != 'POST':
+        result['code'] = 0
+        result['msg'] = _('잘못된 요청입니다.')
+        return JsonResponse(result)
+    
+    phone = request.POST.get('phone', '')
+    if not phone:
+        result['code'] = 0
+        result['msg'] = _('전화번호를 입력해주세요.')
+        return JsonResponse(result)
+    
+    # 하이픈 제거
+    phone_clean = phone.replace('-', '')
+    
+    # 기존 사용자 중 해당 전화번호가 있는지 확인
+    existing_user = UserProfile.objects.filter(phone=phone_clean).first()
+    if existing_user:
+        result['code'] = 0
+        result['msg'] = _('이미 등록된 전화번호입니다.')
+        return JsonResponse(result)
+    
+    # 하이픈 포함 번호로도 확인
+    existing_user = UserProfile.objects.filter(phone=phone).first()
+    if existing_user:
+        result['code'] = 0
+        result['msg'] = _('이미 등록된 전화번호입니다.')
+        return JsonResponse(result)
+    
+    result['msg'] = _('사용 가능한 전화번호입니다.')
+    return JsonResponse(result)
 
 
 def send_verify_code(request):
@@ -826,7 +938,11 @@ def reset_password(request):
     user.set_password(password)
     user.save()
     
-    # 토큰 삭제
+    # 기존 로그인 토큰 무효화 (강제 로그아웃)
+    from api.models import RustDeskToken
+    deleted_tokens = RustDeskToken.objects.filter(uid=user.id).delete()
+    
+    # 재설정 토큰 삭제
     cache.delete(cache_key)
     
     result['code'] = 1
@@ -892,6 +1008,11 @@ def edit_profile(request):
         password_changed = True
     
     u.save()
+    
+    # 비밀번호 변경 시 기존 로그인 토큰 무효화 (강제 로그아웃)
+    if password_changed:
+        from api.models import RustDeskToken
+        RustDeskToken.objects.filter(uid=u.id).delete()
     
     # 비밀번호 변경 시 팀원에게 알림톡 발송
     notified_count = 0
@@ -1696,27 +1817,56 @@ def user_manage(request):
     username = request.user
     u = UserProfile.objects.get(username=username)
     
-    # 최고관리자만 접근 가능
-    if not u.is_superuser:
+    # 최고관리자 또는 그룹관리자만 접근 가능
+    if not (u.is_superuser or u.is_group_admin):
         return HttpResponseRedirect('/api/work')
     
-    # 사용자 목록 조회 (자신 제외)
-    users = UserProfile.objects.exclude(id=u.id).order_by('-is_admin', '-is_active', 'username')
+    # 사용자 목록 조회
+    if u.is_superuser:
+        # 최고관리자는 모든 사용자 조회 (자신 제외)
+        users = UserProfile.objects.exclude(id=u.id).order_by('-is_admin', '-is_active', 'username')
+    else:
+        # 그룹관리자는 자신의 소속 유저만 조회
+        # 같은 group_id 또는 같은 company_name을 가진 유저들
+        users_query = UserProfile.objects.exclude(id=u.id)
+        
+        # group_id가 있는 경우 같은 group_id를 가진 유저들
+        if u.group_id:
+            users_query = users_query.filter(group_id=u.group_id)
+        # company_name이 있는 경우 같은 company_name을 가진 유저들
+        elif u.company_name:
+            users_query = users_query.filter(company_name=u.company_name)
+        else:
+            # group_id와 company_name이 모두 없는 경우 빈 목록
+            users_query = users_query.none()
+        
+        users = users_query.order_by('-is_admin', '-is_active', 'username')
     
     # 그룹(회사) 목록 조회 (콤보박스용)
     groups = Group.objects.filter(uid=u, is_deleted=False).order_by('company_name')
+    
+    # 릴레이 서버 목록 조회
+    relay_servers = RelayServer.objects.filter(is_active=True).order_by('server_address')
     
     # 수정 모드인 경우
     edit_id = request.GET.get('edit', None)
     edit_user = None
     if edit_id:
         edit_user = UserProfile.objects.filter(id=edit_id).exclude(id=u.id).first()
+        # 그룹관리자인 경우 자신의 소속 유저만 수정 가능
+        if u.is_group_admin and not u.is_superuser:
+            if edit_user:
+                if u.group_id and edit_user.group_id != u.group_id:
+                    edit_user = None
+                elif u.company_name and edit_user.company_name != u.company_name:
+                    edit_user = None
     
     return render(request, 'user_manage.html', {
         'u': u,
         'users': users,
         'edit_user': edit_user,
-        'groups': groups
+        'groups': groups,
+        'relay_servers': relay_servers
     })
 
 
@@ -1732,8 +1882,8 @@ def user_manage_save(request):
     username = request.user
     u = UserProfile.objects.get(username=username)
     
-    # 최고관리자만 접근 가능
-    if not u.is_superuser:
+    # 최고관리자 또는 그룹관리자만 접근 가능
+    if not (u.is_superuser or u.is_group_admin):
         result['msg'] = _('권한이 없습니다.')
         return JsonResponse(result)
     
@@ -1745,8 +1895,19 @@ def user_manage_save(request):
     phone = request.POST.get('phone', '')
     membership_level = request.POST.get('membership_level', 'free')
     max_agents = request.POST.get('max_agents', '3')
+    
+    # 릴레이 서버 기본값 처리
+    default_server = RelayServer.objects.filter(is_default=True).first()
+    default_address = default_server.server_address if default_server else '222.239.231.91'
+    # 그룹관리자는 릴레이 서버 변경 불가 (기본값 사용)
+    if u.is_group_admin and not u.is_superuser:
+        relay_server = default_address
+    else:
+        relay_server = request.POST.get('relay_server', default_address)
+    
     is_active = request.POST.get('is_active', '0') == '1'
     is_admin = request.POST.get('is_admin', '0') == '1'
+    is_group_admin = request.POST.get('is_group_admin', '0') == '1'
     new_password = request.POST.get('new_password', '')
     
     try:
@@ -1768,24 +1929,59 @@ def user_manage_save(request):
                 result['msg'] = _('사용자를 찾을 수 없습니다.')
                 return JsonResponse(result)
             
+            # 그룹관리자인 경우 자신의 소속 유저만 수정 가능
+            if u.is_group_admin and not u.is_superuser:
+                if u.group_id and target_user.group_id != u.group_id:
+                    result['msg'] = _('권한이 없습니다. 자신의 소속 유저만 수정할 수 있습니다.')
+                    return JsonResponse(result)
+                elif u.company_name and target_user.company_name != u.company_name:
+                    result['msg'] = _('권한이 없습니다. 자신의 소속 유저만 수정할 수 있습니다.')
+                    return JsonResponse(result)
+                # 그룹관리자는 회사명/그룹 변경 불가 (자신의 그룹으로 고정)
+                company_name = u.company_name if u.company_name else company_name
+                group_id = u.group_id if u.group_id else group_id
+            
             # 최고관리자는 이메일/전화번호 중복 체크 없이 저장 가능
             target_user.company_name = company_name
             target_user.group_id = group_id
             target_user.email = email
             target_user.phone = phone
-            target_user.membership_level = membership_level
-            target_user.max_agents = max_agents
+            # 그룹관리자는 회원등급 변경 불가 (기존 값 유지)
+            if not (u.is_group_admin and not u.is_superuser):
+                target_user.membership_level = membership_level
+            # 그룹관리자는 최대 상담원 변경 불가 (기존 값 유지)
+            if not (u.is_group_admin and not u.is_superuser):
+                target_user.max_agents = max_agents
+            # 그룹관리자는 릴레이 서버 변경 불가 (기존 값 유지)
+            if not (u.is_group_admin and not u.is_superuser):
+                target_user.relay_server = relay_server
             target_user.is_active = is_active
-            target_user.is_admin = is_admin
+            
+            # 관리자 권한 설정 (최고관리자만 가능)
+            if u.is_superuser:
+                target_user.is_admin = is_admin
+                # is_group_admin 설정 (is_admin = true인 유저만 설정 가능)
+                if u.is_admin:
+                    target_user.is_group_admin = is_group_admin
+            else:
+                # 그룹관리자는 관리자 권한 변경 불가 (기존 값 유지)
+                pass
             
             # 비밀번호 변경
+            password_changed = False
             if new_password:
                 if len(new_password) < 8 or len(new_password) > 20:
                     result['msg'] = _('비밀번호 길이가 요구사항에 맞지 않습니다. 8~20자여야 합니다.')
                     return JsonResponse(result)
                 target_user.set_password(new_password)
+                password_changed = True
             
             target_user.save()
+            
+            # 비밀번호 변경 시 기존 로그인 토큰 무효화 (강제 로그아웃)
+            if password_changed:
+                from api.models import RustDeskToken
+                RustDeskToken.objects.filter(uid=target_user.id).delete()
             
             result['code'] = 1
             result['msg'] = _('사용자 정보가 수정되었습니다.')
@@ -1812,17 +2008,41 @@ def user_manage_save(request):
                 result['msg'] = _('비밀번호 길이가 요구사항에 맞지 않습니다. 8~20자여야 합니다.')
                 return JsonResponse(result)
             
+            # 그룹관리자인 경우 자신의 소속으로만 등록 가능
+            if u.is_group_admin and not u.is_superuser:
+                # group_id가 있는 경우 같은 group_id로만 등록 가능
+                if u.group_id:
+                    # 그룹관리자는 회사명/그룹 변경 불가 (자신의 그룹으로 고정)
+                    company_name = u.company_name if u.company_name else company_name
+                    group_id = u.group_id
+                # company_name이 있는 경우 같은 company_name으로만 등록 가능
+                elif u.company_name:
+                    # 그룹관리자는 회사명 변경 불가 (자신의 회사명으로 고정)
+                    company_name = u.company_name
+                    group_id = None
+                # group_id와 company_name이 모두 없는 경우 등록 불가
+                else:
+                    result['msg'] = _('권한이 없습니다. 소속 정보가 없어 등록할 수 없습니다.')
+                    return JsonResponse(result)
+            
             # 최고관리자는 이메일/전화번호 중복 체크 없이 저장 가능
+            # 그룹관리자는 회원등급을 기본값(free)으로 고정
+            final_membership_level = 'free' if (u.is_group_admin and not u.is_superuser) else membership_level
+            # 그룹관리자는 최대 상담원을 기본값(3)으로 고정
+            final_max_agents = 3 if (u.is_group_admin and not u.is_superuser) else max_agents
+            
             new_user = UserProfile(
                 username=target_username,
                 company_name=company_name,
                 group_id=group_id,
                 email=email,
                 phone=phone,
-                membership_level=membership_level,
-                max_agents=max_agents,
+                membership_level=final_membership_level,
+                max_agents=final_max_agents,
+                relay_server=relay_server,
                 is_active=is_active,
-                is_admin=is_admin
+                is_admin=is_admin if u.is_superuser else False,  # 그룹관리자는 관리자 권한 부여 불가
+                is_group_admin=False  # 그룹관리자는 is_group_admin 설정 불가
             )
             new_user.set_password(new_password)
             new_user.save()
@@ -1868,6 +2088,203 @@ def user_manage_delete(request, user_id):
         result['msg'] = _('사용자가 비활성화되었습니다.')
     except Exception as e:
         result['msg'] = _('삭제 중 오류가 발생했습니다: {}').format(str(e))
+    
+    return JsonResponse(result)
+
+
+@login_required(login_url='/api/user_action?action=login')
+def relay_server_list(request):
+    """릴레이 서버 목록 조회 API"""
+    servers = RelayServer.objects.all().order_by('-is_default', '-create_time')
+    data = []
+    for s in servers:
+        data.append({
+            'id': s.id,
+            'server_address': s.server_address,
+            'server_name': s.server_name,
+            'public_key': s.public_key,
+            'is_default': s.is_default,
+            'is_active': s.is_active
+        })
+    return JsonResponse({'code': 0, 'msg': '', 'count': len(data), 'data': data})
+
+
+@login_required(login_url='/api/user_action?action=login')
+def relay_server_set_default(request, id):
+    """릴레이 서버 기본값 설정 API"""
+    try:
+        server = RelayServer.objects.get(id=id)
+        server.is_default = True
+        server.save()  # 모델의 save 메서드에서 다른 서버의 is_default를 False로 만듭니다.
+        return JsonResponse({'code': 1, 'msg': '기본 서버로 설정되었습니다.'})
+    except RelayServer.DoesNotExist:
+        return JsonResponse({'code': 0, 'msg': '존재하지 않는 서버입니다.'})
+
+
+@login_required(login_url='/api/user_action?action=login')
+def relay_server_add(request):
+    """릴레이 서버 추가 API"""
+    if request.method != 'POST':
+        return JsonResponse({'code': 0, 'msg': 'POST 요청만 가능합니다.'})
+    
+    address = request.POST.get('address', '').strip()
+    name = request.POST.get('name', '').strip()
+    public_key = request.POST.get('public_key', '').strip()
+    
+    if not address:
+        return JsonResponse({'code': 0, 'msg': '서버 주소를 입력해주세요.'})
+    
+    if RelayServer.objects.filter(server_address=address).exists():
+        return JsonResponse({'code': 0, 'msg': '이미 존재하는 서버 주소입니다.'})
+    
+    # 첫 번째 서버이거나 요청이 있는 경우 기본값으로 설정
+    is_first = not RelayServer.objects.exists()
+    RelayServer.objects.create(server_address=address, server_name=name, public_key=public_key, is_default=is_first)
+    return JsonResponse({'code': 1, 'msg': '릴레이 서버가 추가되었습니다.'})
+
+
+@login_required(login_url='/api/user_action?action=login')
+def relay_server_delete(request, id):
+    """릴레이 서버 삭제 API"""
+    try:
+        server = RelayServer.objects.get(id=id)
+        server.delete()
+        return JsonResponse({'code': 1, 'msg': '삭제되었습니다.'})
+    except RelayServer.DoesNotExist:
+        return JsonResponse({'code': 0, 'msg': '존재하지 않는 서버입니다.'})
+
+
+@login_required(login_url='/api/user_action?action=login')
+def user_bulk_action(request):
+    """사용자 일괄 처리 API"""
+    result = {'code': 0, 'msg': ''}
+    
+    if request.method != 'POST':
+        result['msg'] = _('잘못된 요청입니다.')
+        return JsonResponse(result)
+    
+    username = request.user
+    u = UserProfile.objects.get(username=username)
+    
+    # 최고관리자 또는 그룹관리자만 접근 가능
+    if not (u.is_superuser or u.is_group_admin):
+        result['msg'] = _('권한이 없습니다.')
+        return JsonResponse(result)
+    
+    action = request.POST.get('action', '')
+    user_ids_str = request.POST.get('user_ids', '[]')
+    
+    try:
+        user_ids = json.loads(user_ids_str)
+        if not isinstance(user_ids, list) or len(user_ids) == 0:
+            result['msg'] = _('선택된 사용자가 없습니다.')
+            return JsonResponse(result)
+        
+        # 최고관리자 제외
+        target_users = UserProfile.objects.filter(id__in=user_ids, is_superuser=False)
+        
+        # 그룹관리자인 경우 자신의 소속 유저만 처리 가능
+        if u.is_group_admin and not u.is_superuser:
+            if u.group_id:
+                target_users = target_users.filter(group_id=u.group_id)
+            elif u.company_name:
+                target_users = target_users.filter(company_name=u.company_name)
+            else:
+                result['msg'] = _('권한이 없습니다. 소속 정보가 없습니다.')
+                return JsonResponse(result)
+        
+        if target_users.count() == 0:
+            result['msg'] = _('처리할 수 있는 사용자가 없습니다.')
+            return JsonResponse(result)
+        
+        if action == 'set_group':
+            # 그룹 변경
+            group_id = request.POST.get('group_id', '')
+            if not group_id:
+                result['msg'] = _('그룹을 선택해주세요.')
+                return JsonResponse(result)
+            
+            try:
+                # 최고관리자는 모든 그룹에 접근 가능
+                group = Group.objects.get(id=group_id, is_deleted=False)
+            except Group.DoesNotExist:
+                result['msg'] = _('그룹을 찾을 수 없습니다.')
+                return JsonResponse(result)
+            
+            updated_count = target_users.update(group_id=group.id, company_name=group.company_name)
+            result['code'] = 1
+            result['msg'] = f'{updated_count}명의 사용자가 "{group.company_name}" 그룹으로 변경되었습니다.'
+            
+        elif action == 'set_status':
+            # 활성화/비활성화
+            is_active = request.POST.get('is_active', '0') == '1'
+            updated_count = target_users.update(is_active=is_active)
+            status_text = '활성화' if is_active else '비활성화'
+            result['code'] = 1
+            result['msg'] = f'{updated_count}명의 사용자가 {status_text}되었습니다.'
+            
+        elif action == 'change_password':
+            # 일괄 암호변경
+            new_password = request.POST.get('new_password', '')
+            notify_kakao = request.POST.get('notify_kakao', '0') == '1'
+            
+            if not new_password:
+                result['msg'] = _('비밀번호를 입력해주세요.')
+                return JsonResponse(result)
+
+            if len(new_password) < 8 or len(new_password) > 20:
+                result['msg'] = _('비밀번호는 8~20자여야 합니다.')
+                return JsonResponse(result)
+
+            # 각 사용자의 비밀번호 변경
+            updated_count = 0
+            kakao_sent_count = 0
+            kakao_failed_users = []
+            
+            # 토큰 무효화를 위한 import
+            from api.models import RustDeskToken
+            
+            for user in target_users:
+                user.set_password(new_password)
+                user.save()
+                
+                # 기존 로그인 토큰 무효화 (강제 로그아웃)
+                RustDeskToken.objects.filter(uid=user.id).delete()
+                
+                updated_count += 1
+                
+                # 카카오톡 알림 발송
+                if notify_kakao and user.phone:
+                    try:
+                        kakao_result = send_kakao_password_notification(
+                            phone=user.phone,
+                            username=user.username,
+                            new_password=new_password,
+                            company_name=user.company_name or ''
+                        )
+                        if kakao_result:
+                            kakao_sent_count += 1
+                        else:
+                            kakao_failed_users.append(user.username)
+                    except Exception as e:
+                        kakao_failed_users.append(user.username)
+
+            result['code'] = 1
+            result['msg'] = f'{updated_count}명의 사용자 비밀번호가 변경되었습니다.'
+            
+            if notify_kakao:
+                if kakao_sent_count > 0:
+                    result['msg'] += f' (카카오톡 알림 {kakao_sent_count}건 발송)'
+                if kakao_failed_users:
+                    result['msg'] += f' (알림 실패: {", ".join(kakao_failed_users[:3])}{"..." if len(kakao_failed_users) > 3 else ""})'
+            
+        else:
+            result['msg'] = _('알 수 없는 작업입니다.')
+            
+    except json.JSONDecodeError:
+        result['msg'] = _('잘못된 데이터 형식입니다.')
+    except Exception as e:
+        result['msg'] = _('처리 중 오류가 발생했습니다: {}').format(str(e))
     
     return JsonResponse(result)
 
@@ -1990,7 +2407,7 @@ def send_custom_app_password_notification(username, member_name, phone, new_pass
                 "rcvNum": phone,
                 "title": new_password,
                 "btnURL1": "",
-                "msg": """나만의 원격 앱의 공통 비밀번호가 변경되었습니다.
+                "msg": """"나만의 원격"앱의 공통 비밀번호가 변경되었습니다.
 팀원분들은 서비스시 참고바랍니다.""",
                 "ptno": "",
                 "rcvDate": "",
@@ -2018,3 +2435,553 @@ def send_custom_app_password_notification(username, member_name, phone, new_pass
     except Exception as e:
         print(f"나만의 원격 알림톡 발송 오류: {str(e)}")
         return False
+
+
+def device_manage(request):
+    """기기 관리 페이지"""
+    u = request.user
+    if not u.is_authenticated:
+        return redirect('/api/user_action?action=login')
+    
+    # 관리자만 접근 가능
+    try:
+        profile = UserProfile.objects.get(username=u.username)
+        if not profile.is_admin:
+            return redirect('/api/work')
+    except:
+        return redirect('/api/work')
+    
+    # 검색/필터 파라미터
+    search = request.GET.get('search', '')
+    selected_status = request.GET.get('status', '')
+    page = request.GET.get('page', 1)
+    
+    # 기기 목록 조회
+    devices = RustDesDevice.objects.all().order_by('-update_time')
+    
+    # 검색 필터
+    if search:
+        devices = devices.filter(
+            Q(rid__icontains=search) |
+            Q(username__icontains=search) |
+            Q(hostname__icontains=search) |
+            Q(ip_address__icontains=search) |
+            Q(os__icontains=search) |
+            Q(version__icontains=search)
+        )
+    
+    # 상태 필터 (최근 5분 이내 업데이트 = 온라인)
+    online_threshold = datetime.datetime.now() - datetime.timedelta(minutes=5)
+    
+    if selected_status == 'online':
+        devices = devices.filter(update_time__gte=online_threshold)
+    elif selected_status == 'offline':
+        devices = devices.filter(update_time__lt=online_threshold)
+    
+    # 통계
+    all_devices = RustDesDevice.objects.all()
+    total_count = all_devices.count()
+    online_count = all_devices.filter(update_time__gte=online_threshold).count()
+    offline_count = total_count - online_count
+    
+    # 온라인 상태 추가
+    device_list = []
+    for device in devices:
+        device.is_online = device.update_time >= online_threshold if device.update_time else False
+        device_list.append(device)
+    
+    # 페이징
+    paginator = Paginator(device_list, 50)  # 페이지당 50개
+    page_obj = paginator.get_page(page)
+    
+    return render(request, 'device_manage.html', {
+        'u': profile,
+        'devices': page_obj,
+        'page_obj': page_obj,
+        'total_count': total_count,
+        'online_count': online_count,
+        'offline_count': offline_count,
+        'search': search,
+        'selected_status': selected_status,
+    })
+
+
+def device_manage_delete(request, rid):
+    """기기 삭제 API"""
+    u = request.user
+    if not u.is_authenticated:
+        return JsonResponse({'code': 0, 'msg': '로그인이 필요합니다.'})
+    
+    try:
+        profile = UserProfile.objects.get(username=u.username)
+        if not profile.is_admin:
+            return JsonResponse({'code': 0, 'msg': '권한이 없습니다.'})
+    except:
+        return JsonResponse({'code': 0, 'msg': '권한이 없습니다.'})
+    
+    try:
+        device = RustDesDevice.objects.filter(rid=rid).first()
+        if device:
+            device.delete()
+            return JsonResponse({'code': 1, 'msg': '삭제되었습니다.'})
+        else:
+            return JsonResponse({'code': 0, 'msg': '기기를 찾을 수 없습니다.'})
+    except Exception as e:
+        return JsonResponse({'code': 0, 'msg': str(e)})
+
+
+def token_manage(request):
+    """토큰 관리 페이지"""
+    u = request.user
+    if not u.is_authenticated:
+        return redirect('/api/user_action?action=login')
+    
+    # 관리자만 접근 가능
+    try:
+        profile = UserProfile.objects.get(username=u.username)
+        if not profile.is_admin:
+            return redirect('/api/work')
+    except:
+        return redirect('/api/work')
+    
+    # 검색/필터 파라미터
+    search = request.GET.get('search', '')
+    selected_status = request.GET.get('status', '')
+    page = request.GET.get('page', 1)
+    
+    # 토큰 목록 조회
+    tokens = RustDeskToken.objects.all().order_by('-create_time')
+    
+    # 검색 필터
+    if search:
+        tokens = tokens.filter(
+            Q(username__icontains=search) |
+            Q(rid__icontains=search) |
+            Q(uuid__icontains=search)
+        )
+    
+    # 토큰 유효 시간 (2시간)
+    active_threshold = datetime.datetime.now() - datetime.timedelta(seconds=7200)
+    
+    # 상태 필터
+    if selected_status == 'active':
+        tokens = tokens.filter(create_time__gte=active_threshold)
+    elif selected_status == 'expired':
+        tokens = tokens.filter(create_time__lt=active_threshold)
+    
+    # 통계
+    all_tokens = RustDeskToken.objects.all()
+    total_count = all_tokens.count()
+    active_count = all_tokens.filter(create_time__gte=active_threshold).count()
+    expired_count = total_count - active_count
+    
+    # 활성 상태 추가
+    token_list = []
+    for token in tokens:
+        token.is_active = token.create_time >= active_threshold if token.create_time else False
+        token_list.append(token)
+    
+    # 페이징
+    paginator = Paginator(token_list, 50)
+    page_obj = paginator.get_page(page)
+    
+    return render(request, 'token_manage.html', {
+        'u': profile,
+        'tokens': page_obj,
+        'page_obj': page_obj,
+        'total_count': total_count,
+        'active_count': active_count,
+        'expired_count': expired_count,
+        'search': search,
+        'selected_status': selected_status,
+    })
+
+
+def token_manage_delete(request, token_id):
+    """토큰 삭제 API"""
+    u = request.user
+    if not u.is_authenticated:
+        return JsonResponse({'code': 0, 'msg': '로그인이 필요합니다.'})
+    
+    try:
+        profile = UserProfile.objects.get(username=u.username)
+        if not profile.is_admin:
+            return JsonResponse({'code': 0, 'msg': '권한이 없습니다.'})
+    except:
+        return JsonResponse({'code': 0, 'msg': '권한이 없습니다.'})
+    
+    try:
+        token = RustDeskToken.objects.filter(id=token_id).first()
+        if token:
+            token.delete()
+            return JsonResponse({'code': 1, 'msg': '삭제되었습니다.'})
+        else:
+            return JsonResponse({'code': 0, 'msg': '토큰을 찾을 수 없습니다.'})
+    except Exception as e:
+        return JsonResponse({'code': 0, 'msg': str(e)})
+
+
+def peer_manage(request):
+    """Peers 관리 페이지"""
+    u = request.user
+    if not u.is_authenticated:
+        return redirect('/api/user_action?action=login')
+    
+    # 관리자만 접근 가능
+    try:
+        profile = UserProfile.objects.get(username=u.username)
+        if not profile.is_admin:
+            return redirect('/api/work')
+    except:
+        return redirect('/api/work')
+    
+    # 검색/필터 파라미터
+    search = request.GET.get('search', '')
+    selected_platform = request.GET.get('platform', '')
+    page = request.GET.get('page', 1)
+    
+    # Peers 목록 조회
+    peers = RustDeskPeer.objects.all().order_by('-rid')
+    
+    # 플랫폼 목록 (필터용)
+    platforms = peers.values_list('platform', flat=True).distinct()
+    platforms = [p for p in platforms if p]
+    
+    # 검색 필터
+    if search:
+        peers = peers.filter(
+            Q(rid__icontains=search) |
+            Q(uid__icontains=search) |
+            Q(username__icontains=search) |
+            Q(hostname__icontains=search) |
+            Q(alias__icontains=search)
+        )
+    
+    # 플랫폼 필터
+    if selected_platform:
+        peers = peers.filter(platform=selected_platform)
+    
+    # 통계
+    total_count = RustDeskPeer.objects.count()
+    
+    # 태그 리스트 추가
+    peer_list = []
+    for peer in peers:
+        peer.tags_list = [t.strip() for t in peer.tags.split(',') if t.strip()] if peer.tags else []
+        peer_list.append(peer)
+    
+    # 페이징
+    paginator = Paginator(peer_list, 50)
+    page_obj = paginator.get_page(page)
+    
+    return render(request, 'peer_manage.html', {
+        'u': profile,
+        'peers': page_obj,
+        'page_obj': page_obj,
+        'total_count': total_count,
+        'search': search,
+        'platforms': platforms,
+        'selected_platform': selected_platform,
+    })
+
+
+def peer_manage_delete(request, peer_id):
+    """Peer 삭제 API"""
+    u = request.user
+    if not u.is_authenticated:
+        return JsonResponse({'code': 0, 'msg': '로그인이 필요합니다.'})
+    
+    try:
+        profile = UserProfile.objects.get(username=u.username)
+        if not profile.is_admin:
+            return JsonResponse({'code': 0, 'msg': '권한이 없습니다.'})
+    except:
+        return JsonResponse({'code': 0, 'msg': '권한이 없습니다.'})
+    
+    try:
+        peer = RustDeskPeer.objects.filter(id=peer_id).first()
+        if peer:
+            peer.delete()
+            return JsonResponse({'code': 1, 'msg': '삭제되었습니다.'})
+        else:
+            return JsonResponse({'code': 0, 'msg': 'Peer를 찾을 수 없습니다.'})
+    except Exception as e:
+        return JsonResponse({'code': 0, 'msg': str(e)})
+
+
+@login_required(login_url='/api/user_action?action=login')
+def user_bulk_template(request):
+    """사용자 일괄 등록 엑셀 양식 다운로드"""
+    username = request.user
+    u = UserProfile.objects.get(username=username)
+    
+    # 최고관리자 또는 그룹관리자만 접근 가능
+    if not (u.is_superuser or u.is_group_admin):
+        return HttpResponse(_('권한이 없습니다.'), status=403)
+    
+    # 엑셀 파일 생성
+    f = xlwt.Workbook(encoding='utf-8')
+    sheet = f.add_sheet('사용자 일괄등록', cell_overwrite_ok=True)
+    
+    # 헤더 스타일
+    header_style = xlwt.XFStyle()
+    header_font = xlwt.Font()
+    header_font.bold = True
+    header_style.font = header_font
+    
+    # 필수 표시 스타일
+    required_style = xlwt.XFStyle()
+    required_font = xlwt.Font()
+    required_font.bold = True
+    required_font.colour_index = 2  # 빨간색
+    required_style.font = required_font
+    
+    # 헤더 작성 (컬럼명)
+    headers = [
+        ('사용자명*', '필수, 4자 이상, 중복불가'),
+        ('비밀번호*', '필수, 8~20자'),
+        ('회사명', '선택'),
+        ('이메일', '선택'),
+        ('휴대전화', '선택'),
+        ('회원등급', 'free/basic/standard/premium/enterprise (기본: free)'),
+        ('최대상담원', '숫자 (기본: 3)'),
+        ('활성화', 'Y/N (기본: Y)'),
+        ('관리자', 'Y/N (기본: N)'),
+    ]
+    
+    # 헤더 행
+    for col, (header, desc) in enumerate(headers):
+        if '*' in header:
+            sheet.write(0, col, header, required_style)
+        else:
+            sheet.write(0, col, header, header_style)
+    
+    # 설명 행
+    desc_style = xlwt.XFStyle()
+    desc_font = xlwt.Font()
+    desc_font.colour_index = 23  # 회색
+    desc_style.font = desc_font
+    
+    for col, (header, desc) in enumerate(headers):
+        sheet.write(1, col, desc, desc_style)
+    
+    # 예시 데이터 행
+    example_data = [
+        ['user001', 'password123', '테스트회사', 'user001@example.com', '010-1234-5678', 'free', '3', 'Y', 'N'],
+        ['user002', 'password456', '샘플회사', 'user002@example.com', '010-9876-5432', 'basic', '5', 'Y', 'N'],
+    ]
+    
+    for row, data in enumerate(example_data, start=2):
+        for col, value in enumerate(data):
+            sheet.write(row, col, value)
+    
+    # 컬럼 너비 조정
+    col_widths = [15, 15, 20, 25, 15, 15, 12, 10, 10]
+    for col, width in enumerate(col_widths):
+        sheet.col(col).width = width * 256
+    
+    # 응답 생성
+    sio = BytesIO()
+    f.save(sio)
+    sio.seek(0)
+    
+    response = HttpResponse(sio.getvalue(), content_type='application/vnd.ms-excel')
+    response['Content-Disposition'] = 'attachment; filename=user_bulk_template.xls'
+    return response
+
+
+@login_required(login_url='/api/user_action?action=login')
+def user_bulk_upload(request):
+    """사용자 일괄 등록 (엑셀 업로드)"""
+    result = {'code': 0, 'msg': '', 'success_count': 0, 'fail_count': 0, 'errors': []}
+    
+    if request.method != 'POST':
+        result['msg'] = _('잘못된 요청입니다.')
+        return JsonResponse(result)
+    
+    username = request.user
+    u = UserProfile.objects.get(username=username)
+    
+    # 최고관리자 또는 그룹관리자만 접근 가능
+    if not (u.is_superuser or u.is_group_admin):
+        result['msg'] = _('권한이 없습니다.')
+        return JsonResponse(result)
+    
+    # 파일 확인
+    excel_file = request.FILES.get('excel_file')
+    if not excel_file:
+        result['msg'] = _('엑셀 파일을 선택해주세요.')
+        return JsonResponse(result)
+    
+    # 파일 확장자 확인
+    file_name = excel_file.name.lower()
+    if not (file_name.endswith('.xls') or file_name.endswith('.xlsx')):
+        result['msg'] = _('엑셀 파일(.xls, .xlsx)만 업로드 가능합니다.')
+        return JsonResponse(result)
+    
+    try:
+        # 엑셀 파일 읽기
+        import openpyxl
+        from openpyxl import load_workbook
+        
+        # .xls 파일인 경우 xlrd 사용
+        if file_name.endswith('.xls'):
+            import xlrd
+            workbook = xlrd.open_workbook(file_contents=excel_file.read())
+            sheet = workbook.sheet_by_index(0)
+            
+            # 데이터 읽기 (3행부터 - 헤더와 설명 행 건너뛰기)
+            rows = []
+            for row_idx in range(2, sheet.nrows):  # 0: 헤더, 1: 설명, 2~: 데이터
+                row_data = []
+                for col_idx in range(sheet.ncols):
+                    cell_value = sheet.cell_value(row_idx, col_idx)
+                    row_data.append(str(cell_value).strip() if cell_value else '')
+                rows.append(row_data)
+        else:
+            # .xlsx 파일인 경우 openpyxl 사용
+            workbook = load_workbook(filename=BytesIO(excel_file.read()))
+            sheet = workbook.active
+            
+            # 데이터 읽기 (3행부터)
+            rows = []
+            for row_idx, row in enumerate(sheet.iter_rows(min_row=3, values_only=True), start=3):
+                if row[0]:  # 첫 번째 컬럼(사용자명)이 있는 경우만
+                    row_data = [str(cell).strip() if cell else '' for cell in row[:9]]
+                    rows.append(row_data)
+        
+        if not rows:
+            result['msg'] = _('등록할 사용자 데이터가 없습니다. (3행부터 데이터를 입력해주세요)')
+            return JsonResponse(result)
+        
+        # 릴레이 서버 기본값 조회
+        default_server = RelayServer.objects.filter(is_default=True).first()
+        default_relay = default_server.server_address if default_server else '222.239.231.91'
+        
+        # 사용자 등록 처리
+        success_count = 0
+        fail_count = 0
+        errors = []
+        
+        for row_num, row in enumerate(rows, start=3):
+            try:
+                # 컬럼 추출 (부족한 경우 기본값으로 채움)
+                while len(row) < 9:
+                    row.append('')
+                
+                target_username = row[0].strip()
+                password = row[1].strip()
+                company_name = row[2].strip() if len(row) > 2 else ''
+                email = row[3].strip() if len(row) > 3 else ''
+                phone = row[4].strip() if len(row) > 4 else ''
+                membership_level = row[5].strip().lower() if len(row) > 5 and row[5] else 'free'
+                max_agents_str = row[6].strip() if len(row) > 6 and row[6] else '3'
+                is_active_str = row[7].strip().upper() if len(row) > 7 and row[7] else 'Y'
+                is_admin_str = row[8].strip().upper() if len(row) > 8 and row[8] else 'N'
+                
+                # 필수 필드 검증
+                if not target_username:
+                    errors.append(f'{row_num}행: 사용자명이 비어있습니다.')
+                    fail_count += 1
+                    continue
+                
+                if len(target_username) <= 3:
+                    errors.append(f'{row_num}행: 사용자명({target_username})은 3자 이상이어야 합니다.')
+                    fail_count += 1
+                    continue
+                
+                if not password:
+                    errors.append(f'{row_num}행: 비밀번호가 비어있습니다.')
+                    fail_count += 1
+                    continue
+                
+                if len(password) < 8 or len(password) > 20:
+                    errors.append(f'{row_num}행: 비밀번호({target_username})는 8~20자여야 합니다.')
+                    fail_count += 1
+                    continue
+                
+                # 사용자명 중복 확인
+                if UserProfile.objects.filter(username=target_username).exists():
+                    errors.append(f'{row_num}행: 사용자명({target_username})이 이미 존재합니다.')
+                    fail_count += 1
+                    continue
+                
+                # 회원등급 검증
+                valid_levels = ['free', 'basic', 'standard', 'premium', 'enterprise']
+                if membership_level not in valid_levels:
+                    membership_level = 'free'
+                
+                # 최대 상담원 수 변환
+                try:
+                    max_agents = int(float(max_agents_str))
+                    if max_agents < 1:
+                        max_agents = 3
+                except:
+                    max_agents = 3
+                
+                # 활성화/관리자 여부 변환
+                is_active = is_active_str in ['Y', 'YES', '1', 'TRUE', '예', '활성']
+                is_admin = is_admin_str in ['Y', 'YES', '1', 'TRUE', '예', '관리자']
+                
+                # 그룹관리자인 경우 자신의 그룹으로만 저장
+                if u.is_group_admin and not u.is_superuser:
+                    # group_id가 있는 경우 같은 group_id로 저장
+                    if u.group_id:
+                        group_id = u.group_id
+                        # 엑셀의 company_name은 무시하고 자신의 company_name 사용
+                        company_name = u.company_name if u.company_name else company_name
+                    # company_name이 있는 경우 같은 company_name으로 저장
+                    elif u.company_name:
+                        group_id = None
+                        company_name = u.company_name
+                    else:
+                        errors.append(f'{row_num}행: 그룹관리자의 소속 정보가 없어 등록할 수 없습니다.')
+                        fail_count += 1
+                        continue
+                    # 그룹관리자는 관리자 권한 부여 불가
+                    is_admin = False
+                else:
+                    # 최고관리자는 엑셀의 group_id를 사용 (없으면 None)
+                    group_id = None
+                
+                # 사용자 생성
+                new_user = UserProfile(
+                    username=target_username,
+                    company_name=company_name,
+                    group_id=group_id,
+                    email=email,
+                    phone=phone,
+                    membership_level=membership_level,
+                    max_agents=max_agents,
+                    relay_server=default_relay,
+                    is_active=is_active,
+                    is_admin=is_admin,
+                    is_group_admin=False  # 그룹관리자는 is_group_admin 설정 불가
+                )
+                new_user.set_password(password)
+                new_user.save()
+                
+                success_count += 1
+                
+            except Exception as e:
+                errors.append(f'{row_num}행: 처리 중 오류 발생 - {str(e)}')
+                fail_count += 1
+        
+        result['code'] = 1 if success_count > 0 else 0
+        result['success_count'] = success_count
+        result['fail_count'] = fail_count
+        result['errors'] = errors[:20]  # 최대 20개까지만 반환
+        
+        if success_count > 0 and fail_count == 0:
+            result['msg'] = f'{success_count}명의 사용자가 성공적으로 등록되었습니다.'
+        elif success_count > 0 and fail_count > 0:
+            result['msg'] = f'{success_count}명 등록 성공, {fail_count}명 등록 실패'
+        else:
+            result['msg'] = f'등록에 실패했습니다. ({fail_count}건 오류)'
+        
+    except Exception as e:
+        result['msg'] = _('엑셀 파일 처리 중 오류가 발생했습니다: {}').format(str(e))
+        import traceback
+        print(f'[엑셀 업로드 오류] {traceback.format_exc()}')
+    
+    return JsonResponse(result)

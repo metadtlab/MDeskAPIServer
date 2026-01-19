@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% load my_filters %}
+{% block title %}기기 관리{% endblock %}
+{% block legend_name %}기기 관리{% endblock %}
+{% block link %}
+<style>
+  .filter-card {
+    background: white;
+    border-radius: 8px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .filter-card .layui-form-item {
+    margin-bottom: 0;
+  }
+  .device-table th {
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+    transition: background-color 0.2s;
+    white-space: nowrap;
+  }
+  .device-table th:hover {
+    background-color: #f0f0f0;
+  }
+  .device-table th::after {
+    content: '⇅';
+    margin-left: 5px;
+    opacity: 0.3;
+    font-size: 11px;
+  }
+  .device-table th.sort-asc::after {
+    content: '↑';
+    opacity: 1;
+    color: #1890ff;
+  }
+  .device-table th.sort-desc::after {
+    content: '↓';
+    opacity: 1;
+    color: #1890ff;
+  }
+  .status-online {
+    color: #52c41a;
+    font-weight: bold;
+  }
+  .status-offline {
+    color: #999;
+  }
+  .device-id {
+    font-family: 'Consolas', monospace;
+    font-weight: bold;
+    color: #1890ff;
+  }
+  .stats-bar {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 15px;
+  }
+  .stat-item {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px 25px;
+    border-radius: 10px;
+    text-align: center;
+    min-width: 120px;
+  }
+  .stat-item.online {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  }
+  .stat-item.offline {
+    background: linear-gradient(135deg, #606c88 0%, #3f4c6b 100%);
+  }
+  .stat-number {
+    font-size: 28px;
+    font-weight: bold;
+  }
+  .stat-label {
+    font-size: 13px;
+    opacity: 0.9;
+    margin-top: 5px;
+  }
+  .action-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+  .search-highlight {
+    background-color: #fff3cd;
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div style="padding: 20px; background-color: #F2F2F2;">
+  <div class="layui-row layui-col-space15">
+    <div class="layui-col-md12">
+      
+      <!-- 통계 바 -->
+      <div class="stats-bar">
+        <div class="stat-item">
+          <div class="stat-number">{{ total_count }}</div>
+          <div class="stat-label">전체 기기</div>
+        </div>
+        <div class="stat-item online">
+          <div class="stat-number">{{ online_count }}</div>
+          <div class="stat-label">온라인</div>
+        </div>
+        <div class="stat-item offline">
+          <div class="stat-number">{{ offline_count }}</div>
+          <div class="stat-label">오프라인</div>
+        </div>
+      </div>
+
+      <!-- 필터/검색 -->
+      <div class="filter-card">
+        <form class="layui-form" id="filterForm">
+          <div class="layui-form-item" style="margin-bottom: 0;">
+            <div class="layui-inline">
+              <label class="layui-form-label" style="width: 80px;">검색</label>
+              <div class="layui-input-inline" style="width: 250px;">
+                <input type="text" id="searchInput" name="search" value="{{ search }}" placeholder="ID, 사용자, 컴퓨터명, IP, OS..." autocomplete="off" class="layui-input">
+              </div>
+            </div>
+            <div class="layui-inline">
+              <label class="layui-form-label" style="width: 80px;">상태</label>
+              <div class="layui-input-inline" style="width: 120px;">
+                <select name="status" id="statusFilter">
+                  <option value="">전체</option>
+                  <option value="online" {% if selected_status == 'online' %}selected{% endif %}>온라인</option>
+                  <option value="offline" {% if selected_status == 'offline' %}selected{% endif %}>오프라인</option>
+                </select>
+              </div>
+            </div>
+            <div class="layui-inline">
+              <button type="submit" class="layui-btn layui-btn-normal">
+                <i class="layui-icon layui-icon-search"></i> 검색
+              </button>
+              <button type="button" class="layui-btn layui-btn-primary" onclick="resetFilter()">
+                <i class="layui-icon layui-icon-refresh"></i> 초기화
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- 기기 목록 테이블 -->
+      <div class="layui-card">
+        <div class="layui-card-header">
+          기기 목록 ({{ devices|length }}개)
+          <span style="float: right; font-size: 12px; color: #999;">
+            헤더 클릭 시 정렬
+          </span>
+        </div>
+        <div class="layui-card-body">
+          <table class="layui-table device-table" id="deviceTable" lay-size="sm">
+            <thead>
+              <tr>
+                <th data-sort="string">클라이언트 ID</th>
+                <th data-sort="string">버전</th>
+                <th data-sort="string">시스템 사용자</th>
+                <th data-sort="string">컴퓨터명</th>
+                <th data-sort="string">OS</th>
+                <th data-sort="string">CPU</th>
+                <th data-sort="string">메모리</th>
+                <th data-sort="string">IP</th>
+                <th data-sort="date">등록일</th>
+                <th data-sort="date">최근 업데이트</th>
+                <th data-sort="string">상태</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for device in devices %}
+              <tr>
+                <td><span class="device-id">{{ device.rid }}</span></td>
+                <td>{{ device.version|default:"-" }}</td>
+                <td>{{ device.username|default:"-" }}</td>
+                <td>{{ device.hostname|default:"-" }}</td>
+                <td title="{{ device.os }}">{{ device.os|truncatechars:25 }}</td>
+                <td title="{{ device.cpu }}">{{ device.cpu|truncatechars:20 }}</td>
+                <td>{{ device.memory|default:"-" }}</td>
+                <td>{{ device.ip_address|default:"-" }}</td>
+                <td>{{ device.create_time|date:"Y-m-d H:i" }}</td>
+                <td>{{ device.update_time|date:"Y-m-d H:i" }}</td>
+                <td>
+                  {% if device.is_online %}
+                  <span class="status-online">● 온라인</span>
+                  {% else %}
+                  <span class="status-offline">○ 오프라인</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <button type="button" class="layui-btn layui-btn-xs layui-btn-danger" onclick="deleteDevice('{{ device.rid }}', '{{ device.hostname }}')">
+                    <i class="layui-icon layui-icon-delete"></i>
+                  </button>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="12" style="text-align: center; color: #999; padding: 40px;">
+                  등록된 기기가 없습니다.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 페이징 -->
+      {% if page_obj.paginator.num_pages > 1 %}
+      <div class="layui-col-md4 layui-col-md-offset4" style="text-align: center; margin-top: 20px;">
+        <span class="step-links">
+          {% if page_obj.has_previous %}
+            <button class="layui-btn layui-btn-sm"><a href="?page=1{% if search %}&search={{ search }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}">&laquo; 처음</a></button>
+            <button class="layui-btn layui-btn-sm"><a href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}">이전</a></button>
+          {% endif %}
+          <span class="current" style="padding: 0 15px;">
+            페이지 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+          </span>
+          {% if page_obj.has_next %}
+            <button class="layui-btn layui-btn-sm"><a href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}">다음</a></button>
+            <button class="layui-btn layui-btn-sm"><a href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}">마지막 &raquo;</a></button>
+          {% endif %}
+        </span>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<script>
+layui.use(['form', 'layer', 'jquery'], function() {
+    var form = layui.form;
+    var layer = layui.layer;
+    var $ = layui.jquery;
+    
+    // 테이블 정렬
+    var table = document.getElementById('deviceTable');
+    var headers = table.querySelectorAll('th[data-sort]');
+    
+    headers.forEach(function(header, index) {
+        header.addEventListener('click', function() {
+            var sortType = header.getAttribute('data-sort');
+            var tbody = table.querySelector('tbody');
+            var rows = Array.from(tbody.querySelectorAll('tr'));
+            var isAsc = header.classList.contains('sort-asc');
+            
+            headers.forEach(function(h) {
+                h.classList.remove('sort-asc', 'sort-desc');
+            });
+            
+            if (isAsc) {
+                header.classList.add('sort-desc');
+            } else {
+                header.classList.add('sort-asc');
+            }
+            
+            rows.sort(function(a, b) {
+                var aVal = a.cells[index] ? a.cells[index].textContent.trim() : '';
+                var bVal = b.cells[index] ? b.cells[index].textContent.trim() : '';
+                
+                if (sortType === 'date') {
+                    aVal = new Date(aVal) || 0;
+                    bVal = new Date(bVal) || 0;
+                } else {
+                    aVal = aVal.toLowerCase();
+                    bVal = bVal.toLowerCase();
+                }
+                
+                if (aVal < bVal) return isAsc ? 1 : -1;
+                if (aVal > bVal) return isAsc ? -1 : 1;
+                return 0;
+            });
+            
+            rows.forEach(function(row) {
+                tbody.appendChild(row);
+            });
+        });
+    });
+    
+    // 폼 렌더링
+    form.render();
+});
+
+function resetFilter() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('ownerFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    window.location.href = '/api/device_manage';
+}
+
+function deleteDevice(rid, hostname) {
+    layui.use('layer', function() {
+        var layer = layui.layer;
+        layer.confirm('기기 <strong>' + hostname + '</strong> (ID: ' + rid + ')를 삭제하시겠습니까?', {
+            title: '기기 삭제',
+            btn: ['삭제', '취소']
+        }, function(index) {
+            layui.jquery.ajax({
+                url: '/api/device_manage/delete/' + rid,
+                type: 'POST',
+                dataType: 'json',
+                success: function(resp) {
+                    if (resp.code == 1) {
+                        layer.msg('삭제되었습니다.', {icon: 1});
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        layer.msg(resp.msg || '삭제 실패', {icon: 5});
+                    }
+                },
+                error: function() {
+                    layer.msg('요청 중 오류가 발생했습니다.', {icon: 5});
+                }
+            });
+            layer.close(index);
+        });
+    });
+}
+</script>
+{% endblock %}
+

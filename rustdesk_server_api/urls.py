@@ -44,6 +44,7 @@ urlpatterns = [
     url(r'^webui/', include('webui.urls')),
     url(r'^static/(?P<path>.*)$', static.serve, {'document_root': settings.STATIC_ROOT}, name='static'),
     url(r'^media/(?P<path>.*)$', static.serve, {'document_root': settings.MEDIA_ROOT}, name='media'),
+    url(r'^executables/(?P<path>.*)$', static.serve, {'document_root': os.path.join(settings.BASE_DIR, 'executables')}, name='executables'),
     url(r'^canvaskit@0.33.0/(?P<path>.*)$', static.serve, {'document_root': 'static/web_client/canvaskit@0.33.0'},name='web_client'),
     url(r'^(?P<username>[\w.@+-]+)$', views_front.public_support),
 ]

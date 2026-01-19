@@ -20,7 +20,7 @@
             <div class="layui-form-item">
               <label class="layui-form-label">사용자명 <span style="color:red;">*</span></label>
               <div class="layui-input-block">
-                <input type="text" id="username" name="username" value="{% if edit_user %}{{edit_user.username}}{% endif %}" {% if edit_user %}disabled{% else %}lay-verify="required"{% endif %} placeholder="사용자명을 입력하세요" autocomplete="off" class="layui-input">
+                <input type="text" id="username" name="username" value="{% if edit_user %}{{edit_user.username}}{% endif %}" {% if edit_user %}disabled{% else %}lay-verify="required" lay-reqtext="사용자명을 입력하세요."{% endif %} placeholder="사용자명을 입력하세요" autocomplete="off" class="layui-input">
                 {% if edit_user %}
                 <div class="layui-form-mid layui-word-aux">사용자명은 변경할 수 없습니다.</div>
                 {% endif %}
@@ -30,25 +30,46 @@
             <div class="layui-form-item">
               <label class="layui-form-label">{% if edit_user %}새 비밀번호{% else %}비밀번호 <span style="color:red;">*</span>{% endif %}</label>
               <div class="layui-input-block">
-                <input type="password" id="new_password" name="new_password" {% if not edit_user %}lay-verify="required"{% endif %} placeholder="{% if edit_user %}변경하려면 입력 (8~20자){% else %}비밀번호 입력 (8~20자){% endif %}" autocomplete="off" class="layui-input">
+                <input type="password" id="new_password" name="new_password" {% if not edit_user %}lay-verify="required" lay-reqtext="비밀번호를 입력하세요."{% endif %} placeholder="{% if edit_user %}변경하려면 입력 (8~20자){% else %}비밀번호 입력 (8~20자){% endif %}" autocomplete="off" class="layui-input">
               </div>
             </div>
             
             <div class="layui-form-item">
               <label class="layui-form-label">회사명</label>
-              <div class="layui-input-inline" style="width: 280px;">
-                <input type="text" id="company_name" name="company_name" value="{% if edit_user %}{{edit_user.company_name}}{% endif %}" placeholder="회사명 직접 입력" autocomplete="off" class="layui-input">
+              <div class="layui-input-block" style="display: flex; align-items: center; gap: 8px;">
+                {% if u.is_group_admin and not u.is_superuser %}
+                <!-- 그룹관리자는 회사명/그룹 변경 불가 -->
+                <input type="text" id="company_name" name="company_name" value="{% if edit_user %}{{edit_user.company_name}}{% else %}{{u.company_name}}{% endif %}" placeholder="직접 입력" autocomplete="off" class="layui-input" style="width: 126px; flex-shrink: 0;" readonly disabled>
+                <span style="color: #999; font-size: 12px;">또는</span>
+                <div style="width: 126px; flex-shrink: 0;">
+                  <select id="company_select" lay-filter="companySelect" disabled style="background-color: #f2f2f2; cursor: not-allowed;">
+                    <option value="">그룹 선택</option>
+                    {% for group in groups %}
+                    <option value="{{group.id}}" data-company="{{group.company_name}}" {% if edit_user and edit_user.group_id == group.id %}selected{% elif not edit_user and u.group_id == group.id %}selected{% endif %}>{{group.company_name}}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <input type="hidden" id="group_id" name="group_id" value="{% if edit_user.group_id %}{{edit_user.group_id}}{% else %}{{u.group_id}}{% endif %}">
+                {% else %}
+                <!-- 최고관리자는 회사명/그룹 변경 가능 -->
+                <input type="text" id="company_name" name="company_name" value="{% if edit_user %}{{edit_user.company_name}}{% endif %}" placeholder="직접 입력" autocomplete="off" class="layui-input" style="width: 126px; flex-shrink: 0;">
+                <span style="color: #999; font-size: 12px;">또는</span>
+                <div style="width: 126px; flex-shrink: 0;">
+                  <select id="company_select" lay-filter="companySelect">
+                    <option value="">그룹 선택</option>
+                    {% for group in groups %}
+                    <option value="{{group.id}}" data-company="{{group.company_name}}" {% if edit_user and edit_user.group_id == group.id %}selected{% endif %}>{{group.company_name}}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <input type="hidden" id="group_id" name="group_id" value="{% if edit_user.group_id %}{{edit_user.group_id}}{% endif %}">
+                {% endif %}
               </div>
-              <div class="layui-input-inline" style="width: 180px;">
-                <select id="company_select" lay-filter="companySelect">
-                  <option value="">-- 그룹 선택 --</option>
-                  {% for group in groups %}
-                  <option value="{{group.id}}" data-company="{{group.company_name}}" {% if edit_user and edit_user.group_id == group.id %}selected{% endif %}>{{group.company_name}}</option>
-                  {% endfor %}
-                </select>
+              {% if u.is_group_admin and not u.is_superuser %}
+              <div class="layui-input-block" style="margin-top: 5px;">
+                <div class="layui-form-mid layui-word-aux" style="color: #999;">그룹관리자는 회사명/그룹을 변경할 수 없습니다.</div>
               </div>
-              <input type="hidden" id="group_id" name="group_id" value="{% if edit_user.group_id %}{{edit_user.group_id}}{% endif %}">
-              <div class="layui-form-mid layui-word-aux" style="padding-left: 0;">그룹에서 선택 가능</div>
+              {% endif %}
             </div>
             
             <div class="layui-form-item">
@@ -68,7 +89,7 @@
             <div class="layui-form-item">
               <label class="layui-form-label">회원등급</label>
               <div class="layui-input-block">
-                <select id="membership_level" name="membership_level">
+                <select id="membership_level" name="membership_level" {% if u.is_group_admin and not u.is_superuser %}disabled style="background-color: #f2f2f2; cursor: not-allowed;"{% endif %}>
                   <option value="free" {% if edit_user.membership_level == 'free' %}selected{% endif %}>무료</option>
                   <option value="basic" {% if edit_user.membership_level == 'basic' %}selected{% endif %}>기본</option>
                   <option value="standard" {% if edit_user.membership_level == 'standard' %}selected{% endif %}>스탠다드</option>
@@ -78,12 +99,33 @@
               </div>
             </div>
             
+            {% if not u.is_group_admin or u.is_superuser %}
             <div class="layui-form-item">
               <label class="layui-form-label">최대 상담원</label>
               <div class="layui-input-block">
                 <input type="number" id="max_agents" name="max_agents" value="{% if edit_user %}{{edit_user.max_agents}}{% else %}3{% endif %}" min="1" max="100" class="layui-input">
               </div>
             </div>
+            {% endif %}
+            
+            {% if not u.is_group_admin or u.is_superuser %}
+            <div class="layui-form-item">
+              <label class="layui-form-label">릴레이 서버</label>
+              <div class="layui-input-block">
+                <select id="relay_server" name="relay_server" lay-search disabled style="background-color: #f2f2f2; cursor: not-allowed;">
+                  <option value="">-- 릴레이 서버 선택 --</option>
+                  {% for rs in relay_servers %}
+                  <option value="{{rs.server_address}}" {% if edit_user %}{% if edit_user.relay_server == rs.server_address %}selected{% endif %}{% else %}{% if rs.is_default %}selected{% endif %}{% endif %}>{{rs.server_address}} ({% if rs.server_name %}{{rs.server_name}}{% else %}추가됨{% endif %}){% if rs.is_default %} [기본]{% endif %}</option>
+                  {% endfor %}
+                </select>
+                <div style="margin-top: 5px;">
+                  <button type="button" class="layui-btn layui-btn-xs layui-btn-disabled" disabled>
+                    <i class="layui-icon layui-icon-set"></i> 릴레이 서버 관리 (준비중)
+                  </button>
+                </div>
+              </div>
+            </div>
+            {% endif %}
             
             <div class="layui-form-item">
               <label class="layui-form-label">상태</label>
@@ -92,12 +134,31 @@
               </div>
             </div>
             
+            {% if u.is_superuser %}
             <div class="layui-form-item">
               <label class="layui-form-label">관리자 권한</label>
               <div class="layui-input-block">
                 <input type="checkbox" id="is_admin" name="is_admin" lay-skin="switch" lay-text="관리자|일반" {% if edit_user.is_admin %}checked{% endif %}>
               </div>
             </div>
+            
+            {% if u.is_admin %}
+            <div class="layui-form-item">
+              <label class="layui-form-label">그룹 관리자 권한</label>
+              <div class="layui-input-block">
+                <input type="checkbox" id="is_group_admin" name="is_group_admin" lay-skin="switch" lay-text="그룹관리자|일반" {% if edit_user.is_group_admin %}checked{% endif %}>
+              </div>
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="layui-form-item">
+              <label class="layui-form-label">관리자 권한</label>
+              <div class="layui-input-block">
+                <input type="checkbox" id="is_admin" name="is_admin" lay-skin="switch" lay-text="관리자|일반" {% if edit_user.is_admin %}checked{% endif %} disabled>
+                <div class="layui-form-mid layui-word-aux" style="color: #999;">그룹관리자는 관리자 권한을 설정할 수 없습니다.</div>
+              </div>
+            </div>
+            {% endif %}
             
             <div class="layui-form-item">
               <div class="layui-input-block">
@@ -118,26 +179,138 @@
           </form>
         </div>
       </div>
+      
+      <!-- 엑셀 일괄 등록 -->
+      <div class="layui-card" style="margin-top: 15px;">
+        <div class="layui-card-header">
+          <i class="layui-icon layui-icon-upload-drag"></i>
+          엑셀 일괄 등록
+        </div>
+        <div class="layui-card-body">
+          <form class="layui-form" id="bulkUploadForm" enctype="multipart/form-data">
+            <div class="layui-form-item">
+              <div class="layui-input-block" style="margin-left: 0;">
+                <div style="margin-bottom: 10px;">
+                  <a href="/api/user_manage/bulk_template" class="layui-btn layui-btn-sm layui-btn-primary">
+                    <i class="layui-icon layui-icon-download-circle"></i> 양식 다운로드
+                  </a>
+                  <span style="color: #999; font-size: 12px; margin-left: 10px;">※ 양식 파일을 다운로드하여 작성 후 업로드하세요.</span>
+                  {% if u.is_group_admin and not u.is_superuser %}
+                  <div style="margin-top: 5px; padding: 8px; background: #e6f7ff; border-left: 3px solid #1890ff; border-radius: 4px;">
+                    <span style="color: #1890ff; font-size: 12px;"><i class="layui-icon layui-icon-tips"></i> 그룹관리자: 등록되는 사용자는 자동으로 현재 그룹({{u.company_name|default:u.group_id}})에 소속됩니다.</span>
+                  </div>
+                  {% endif %}
+                </div>
+                <div class="layui-upload-drag" id="uploadArea" style="padding: 20px; border: 1px dashed #e2e2e2; text-align: center; cursor: pointer;">
+                  <i class="layui-icon layui-icon-upload" style="font-size: 30px; color: #009688;"></i>
+                  <p style="margin: 10px 0; color: #999;">엑셀 파일을 드래그하거나 클릭하여 선택</p>
+                  <p style="font-size: 12px; color: #ccc;">.xls, .xlsx 파일만 가능</p>
+                  <input type="file" id="excelFile" name="excel_file" accept=".xls,.xlsx" style="display: none;">
+                </div>
+                <div id="fileInfo" style="margin-top: 10px; display: none;">
+                  <span id="fileName" style="color: #009688;"></span>
+                  <button type="button" class="layui-btn layui-btn-xs layui-btn-danger" onclick="clearFile()">
+                    <i class="layui-icon layui-icon-close"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="layui-form-item">
+              <div class="layui-input-block" style="margin-left: 0;">
+                <button type="button" id="uploadBtn" class="layui-btn layui-btn-normal" onclick="uploadExcel()" disabled>
+                  <i class="layui-icon layui-icon-upload"></i> 일괄 등록
+                </button>
+              </div>
+            </div>
+          </form>
+          <div id="uploadResult" style="display: none; margin-top: 15px; padding: 15px; background: #f8f8f8; border-radius: 4px;">
+            <div id="resultSummary"></div>
+            <div id="resultErrors" style="margin-top: 10px; max-height: 150px; overflow-y: auto;"></div>
+          </div>
+        </div>
+      </div>
     </div>
     
     <!-- 우측: 사용자 목록 -->
     <div class="layui-col-md7">
       <div class="layui-card">
-        <div class="layui-card-header">
-          <i class="layui-icon layui-icon-user"></i>
-          사용자 목록 (총 {{users|length}}명)
+        <div class="layui-card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <span>
+            <i class="layui-icon layui-icon-user"></i>
+            사용자 목록 (<span id="filteredCount">{{users|length}}</span>/{{users|length}}명)
+            <span id="selectedCount" style="color: #009688; margin-left: 10px; display: none;">선택: <strong>0</strong>명</span>
+          </span>
+          <!-- 일괄 처리 버튼 영역 (헤더 내부) -->
+          <div id="bulkActionBar" style="display: none; align-items: center; gap: 8px;">
+            {% if not u.is_group_admin or u.is_superuser %}
+            <select id="bulkGroupSelect" class="layui-input" style="width: 130px; height: 28px; padding: 0 8px; font-size: 12px;">
+              <option value="">그룹 선택</option>
+              {% for group in groups %}
+              <option value="{{group.id}}">{{group.company_name}}</option>
+              {% endfor %}
+            </select>
+            <button type="button" class="layui-btn layui-btn-xs layui-btn-normal" onclick="bulkSetGroup()" title="선택한 사용자의 그룹 변경">
+              <i class="layui-icon layui-icon-group"></i>
+            </button>
+            {% endif %}
+            {% if not u.is_group_admin or u.is_superuser %}
+            <button type="button" class="layui-btn layui-btn-xs layui-btn-warm" onclick="bulkSetStatus(true)" title="선택한 사용자 활성화">
+              <i class="layui-icon layui-icon-ok"></i>
+            </button>
+            <button type="button" class="layui-btn layui-btn-xs layui-btn-danger" onclick="bulkSetStatus(false)" title="선택한 사용자 비활성화">
+              <i class="layui-icon layui-icon-close"></i>
+            </button>
+            {% endif %}
+            {% if u.is_group_admin and not u.is_superuser %}
+            <button type="button" class="layui-btn layui-btn-xs layui-btn-normal" onclick="bulkChangePassword()" title="선택한 사용자 암호 변경">
+              <i class="layui-icon layui-icon-password"></i> 암호변경
+            </button>
+            {% endif %}
+          </div>
         </div>
-        <div class="layui-card-body" style="padding: 0;">
+        <!-- 검색/필터 영역 -->
+        <div style="padding: 10px 15px; background: #fafafa; border-bottom: 1px solid #e2e2e2; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <input type="text" id="searchInput" placeholder="사용자명/회사명 검색" class="layui-input" style="width: 150px; height: 28px; font-size: 12px;" onkeyup="filterUsers()">
+            <button type="button" class="layui-btn layui-btn-xs layui-btn-primary" onclick="clearSearch()" title="검색 초기화">
+              <i class="layui-icon layui-icon-refresh"></i>
+            </button>
+          </div>
+          <select id="filterStatus" class="layui-input" style="width: 80px; height: 28px; font-size: 12px;" onchange="filterUsers()">
+            <option value="">전체</option>
+            <option value="active">활성</option>
+            <option value="inactive">비활성</option>
+          </select>
+          <select id="filterGroup" class="layui-input" style="width: 110px; height: 28px; font-size: 12px;" onchange="filterUsers()">
+            <option value="">전체 그룹</option>
+            {% for group in groups %}
+            <option value="{{group.company_name}}">{{group.company_name}}</option>
+            {% endfor %}
+          </select>
+          <select id="filterLevel" class="layui-input" style="width: 90px; height: 28px; font-size: 12px;" onchange="filterUsers()">
+            <option value="">전체 등급</option>
+            <option value="무료">무료</option>
+            <option value="기본">기본</option>
+            <option value="스탠다드">스탠다드</option>
+            <option value="프리미엄">프리미엄</option>
+            <option value="엔터프라이즈">엔터프라이즈</option>
+          </select>
+        </div>
+        <div class="layui-card-body layui-form" style="padding: 0;">
           <table class="layui-table" lay-skin="line" style="margin: 0;">
             <colgroup>
-              <col width="20%">
-              <col width="20%">
-              <col width="15%">
-              <col width="15%">
-              <col width="30%">
+              <col width="5%">
+              <col width="18%">
+              <col width="18%">
+              <col width="12%">
+              <col width="12%">
+              <col width="35%">
             </colgroup>
             <thead>
               <tr>
+                <th style="text-align: center;">
+                  <input type="checkbox" id="checkAll" lay-skin="primary" lay-filter="checkAll">
+                </th>
                 <th>사용자명</th>
                 <th>회사명</th>
                 <th>등급</th>
@@ -147,7 +320,12 @@
             </thead>
             <tbody>
               {% for user in users %}
-              <tr style="{% if not user.is_active %}background-color: #f5f5f5; color: #999;{% endif %}">
+              <tr style="{% if not user.is_active %}background-color: #f5f5f5; color: #999;{% endif %}" data-user-id="{{user.id}}" data-is-superuser="{{user.is_superuser|yesno:'true,false'}}">
+                <td style="text-align: center;">
+                  {% if not user.is_superuser %}
+                  <input type="checkbox" class="user-checkbox" lay-skin="primary" value="{{user.id}}" lay-filter="userCheck">
+                  {% endif %}
+                </td>
                 <td>
                   <strong>{{user.username}}</strong>
                   {% if user.is_superuser %}
@@ -191,7 +369,7 @@
               </tr>
               {% empty %}
               <tr>
-                <td colspan="5" style="text-align: center; color: #999; padding: 40px;">
+                <td colspan="6" style="text-align: center; color: #999; padding: 40px;">
                   <i class="layui-icon layui-icon-face-surprised" style="font-size: 40px;"></i>
                   <br><br>등록된 사용자가 없습니다.
                 </td>
@@ -205,8 +383,485 @@
   </div>
 </div>
 
+<!-- 일괄 암호변경 모달 -->
+<div id="bulkPasswordModal" style="display: none; padding: 20px;">
+  <form class="layui-form" id="bulkPasswordForm">
+    {% if u.is_group_admin and not u.is_superuser %}
+    <!-- 그룹관리자: 그룹원 목록 표시 -->
+    <div class="layui-form-item">
+      <label class="layui-form-label">그룹원 선택</label>
+      <div class="layui-input-block" style="max-height: 200px; overflow-y: auto; border: 1px solid #e2e2e2; padding: 10px; border-radius: 4px;">
+        <div style="margin-bottom: 10px;">
+          <input type="checkbox" id="selectAllGroupMembers" lay-skin="primary" lay-filter="selectAllGroupMembers" checked>
+          <label for="selectAllGroupMembers" style="margin-left: 5px; font-weight: bold;">전체 선택</label>
+        </div>
+        <div id="groupMembersList">
+          {% for user in users %}
+          <div style="margin: 5px 0;">
+            <input type="checkbox" name="group_member_ids" value="{{user.id}}" lay-skin="primary" class="group-member-checkbox" checked>
+            <label style="margin-left: 5px;">{{user.username}} {% if user.company_name %}({{user.company_name}}){% endif %}</label>
+          </div>
+          {% empty %}
+          <div style="color: #999; text-align: center; padding: 20px;">등록된 그룹원이 없습니다.</div>
+          {% endfor %}
+        </div>
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e2e2;">
+          <span id="selectedGroupMembersCount" style="color: #009688; font-weight: bold;">{{users|length}}명 선택됨</span>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <!-- 최고관리자: 선택된 사용자 수만 표시 -->
+    <div class="layui-form-item">
+      <label class="layui-form-label">선택된 사용자</label>
+      <div class="layui-input-block">
+        <span id="selectedUsersCount" style="color: #009688; font-weight: bold;">0명</span>
+      </div>
+    </div>
+    {% endif %}
+    <div class="layui-form-item">
+      <label class="layui-form-label">새 비밀번호 <span style="color:red;">*</span></label>
+      <div class="layui-input-block">
+        <input type="password" id="bulkNewPassword" name="bulkNewPassword" lay-verify="required|password" placeholder="8~20자리 비밀번호 입력" autocomplete="off" class="layui-input">
+        <div class="layui-form-mid layui-word-aux">8~20자리, 영문, 숫자, 특수문자 포함 가능</div>
+      </div>
+    </div>
+    <div class="layui-form-item">
+      <label class="layui-form-label">비밀번호 확인 <span style="color:red;">*</span></label>
+      <div class="layui-input-block">
+        <input type="password" id="bulkPasswordConfirm" name="bulkPasswordConfirm" lay-verify="required" placeholder="비밀번호를 다시 입력하세요" autocomplete="off" class="layui-input">
+      </div>
+    </div>
+    <div class="layui-form-item">
+      <div class="layui-input-block">
+        <button type="submit" lay-submit lay-filter="bulkPasswordSubmit" class="layui-btn">변경</button>
+        <button type="button" class="layui-btn layui-btn-primary" onclick="closeBulkPasswordModal()">취소</button>
+      </div>
+    </div>
+  </form>
+</div>
+
 <script type="text/javascript">
     var isSubmitting = false;
+    var selectedFile = null;
+    
+    // 파일 선택 영역 클릭/드래그 이벤트
+    document.addEventListener('DOMContentLoaded', function() {
+        var uploadArea = document.getElementById('uploadArea');
+        var fileInput = document.getElementById('excelFile');
+        
+        // 클릭으로 파일 선택
+        uploadArea.addEventListener('click', function() {
+            fileInput.click();
+        });
+        
+        // 파일 선택 시
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+        
+        // 드래그 앤 드롭
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#009688';
+            uploadArea.style.background = '#f0f9f8';
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#e2e2e2';
+            uploadArea.style.background = 'transparent';
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#e2e2e2';
+            uploadArea.style.background = 'transparent';
+            
+            if (e.dataTransfer.files.length > 0) {
+                handleFileSelect(e.dataTransfer.files[0]);
+            }
+        });
+    });
+    
+    function handleFileSelect(file) {
+        var fileName = file.name.toLowerCase();
+        if (!fileName.endsWith('.xls') && !fileName.endsWith('.xlsx')) {
+            layui.layer.msg('엑셀 파일(.xls, .xlsx)만 업로드 가능합니다.', {icon: 2});
+            return;
+        }
+        
+        selectedFile = file;
+        document.getElementById('fileName').textContent = file.name + ' (' + formatFileSize(file.size) + ')';
+        document.getElementById('fileInfo').style.display = 'block';
+        document.getElementById('uploadBtn').disabled = false;
+        document.getElementById('uploadResult').style.display = 'none';
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+    
+    function clearFile() {
+        selectedFile = null;
+        document.getElementById('excelFile').value = '';
+        document.getElementById('fileInfo').style.display = 'none';
+        document.getElementById('uploadBtn').disabled = true;
+        document.getElementById('uploadResult').style.display = 'none';
+    }
+    
+    function uploadExcel() {
+        if (!selectedFile) {
+            layui.layer.msg('파일을 선택해주세요.', {icon: 2});
+            return;
+        }
+        
+        var formData = new FormData();
+        formData.append('excel_file', selectedFile);
+        
+        var loadingIndex = layui.layer.load(1, {shade: [0.3, '#000']});
+        document.getElementById('uploadBtn').disabled = true;
+        
+        layui.jquery.ajax({
+            url: '/api/user_manage/bulk_upload',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            dataType: 'json',
+            success: function(resp) {
+                layui.layer.close(loadingIndex);
+                document.getElementById('uploadBtn').disabled = false;
+                
+                // 결과 표시
+                var resultDiv = document.getElementById('uploadResult');
+                var summaryDiv = document.getElementById('resultSummary');
+                var errorsDiv = document.getElementById('resultErrors');
+                
+                resultDiv.style.display = 'block';
+                
+                var summaryHtml = '';
+                if (resp.code == 1) {
+                    summaryHtml = '<span style="color: #009688;"><i class="layui-icon layui-icon-ok-circle"></i> ' + resp.msg + '</span>';
+                    if (resp.success_count > 0) {
+                        summaryHtml += '<br><span style="color: #5FB878;">성공: ' + resp.success_count + '건</span>';
+                    }
+                    if (resp.fail_count > 0) {
+                        summaryHtml += ' <span style="color: #FF5722;">실패: ' + resp.fail_count + '건</span>';
+                    }
+                } else {
+                    summaryHtml = '<span style="color: #FF5722;"><i class="layui-icon layui-icon-close-fill"></i> ' + resp.msg + '</span>';
+                }
+                summaryDiv.innerHTML = summaryHtml;
+                
+                // 오류 목록 표시
+                if (resp.errors && resp.errors.length > 0) {
+                    var errorsHtml = '<div style="font-size: 12px; color: #666;"><strong>오류 상세:</strong><ul style="margin: 5px 0; padding-left: 20px;">';
+                    resp.errors.forEach(function(err) {
+                        errorsHtml += '<li style="color: #FF5722;">' + err + '</li>';
+                    });
+                    errorsHtml += '</ul></div>';
+                    errorsDiv.innerHTML = errorsHtml;
+                } else {
+                    errorsDiv.innerHTML = '';
+                }
+                
+                // 성공 시 페이지 새로고침
+                if (resp.code == 1 && resp.success_count > 0) {
+                    setTimeout(function() {
+                        location.reload();
+                    }, 2000);
+                }
+            },
+            error: function() {
+                layui.layer.close(loadingIndex);
+                document.getElementById('uploadBtn').disabled = false;
+                layui.layer.msg('업로드 중 오류가 발생했습니다.', {icon: 2});
+            }
+        });
+    }
+    
+    // 선택된 사용자 ID 목록 가져오기
+    window.getSelectedUserIds = function() {
+        var ids = [];
+        var checkboxes = document.querySelectorAll('.user-checkbox:checked');
+        for (var i = 0; i < checkboxes.length; i++) {
+            // 보이는 행의 체크박스만 포함
+            var row = checkboxes[i].closest('tr');
+            if (row && row.style.display !== 'none') {
+                ids.push(checkboxes[i].value);
+            }
+        }
+        return ids;
+    };
+    
+    // 선택 상태 업데이트
+    window.updateSelectionUI = function() {
+        var selected = getSelectedUserIds();
+        var countSpan = document.getElementById('selectedCount');
+        var actionBar = document.getElementById('bulkActionBar');
+        
+        if (selected.length > 0) {
+            countSpan.style.display = 'inline';
+            countSpan.querySelector('strong').textContent = selected.length;
+            actionBar.style.display = 'flex';
+        } else {
+            countSpan.style.display = 'none';
+            actionBar.style.display = 'none';
+        }
+    };
+    
+    // 사용자 필터링
+    window.filterUsers = function() {
+        var searchText = document.getElementById('searchInput').value.toLowerCase();
+        var statusFilter = document.getElementById('filterStatus').value;
+        var groupFilter = document.getElementById('filterGroup').value;
+        var levelFilter = document.getElementById('filterLevel').value;
+        
+        var rows = document.querySelectorAll('table.layui-table tbody tr[data-user-id]');
+        var visibleCount = 0;
+        
+        rows.forEach(function(row) {
+            var username = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+            var company = row.querySelector('td:nth-child(3)').textContent.trim();
+            var level = row.querySelector('td:nth-child(4)').textContent.trim();
+            var statusBadge = row.querySelector('td:nth-child(5) .layui-badge');
+            var isActive = statusBadge ? statusBadge.classList.contains('layui-bg-green') : false;
+            
+            var matchSearch = !searchText || username.includes(searchText) || company.toLowerCase().includes(searchText);
+            var matchStatus = !statusFilter || 
+                              (statusFilter === 'active' && isActive) || 
+                              (statusFilter === 'inactive' && !isActive);
+            var matchGroup = !groupFilter || company === groupFilter;
+            var matchLevel = !levelFilter || level === levelFilter;
+            
+            if (matchSearch && matchStatus && matchGroup && matchLevel) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('filteredCount').textContent = visibleCount;
+        
+        // 전체 선택 체크박스 해제
+        document.getElementById('checkAll').checked = false;
+        document.querySelectorAll('.user-checkbox').forEach(function(cb) {
+            if (cb.closest('tr').style.display === 'none') {
+                cb.checked = false;
+            }
+        });
+        updateSelectionUI();
+    };
+    
+    // 검색 초기화
+    window.clearSearch = function() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('filterStatus').value = '';
+        document.getElementById('filterGroup').value = '';
+        document.getElementById('filterLevel').value = '';
+        filterUsers();
+    };
+    
+    // 일괄 그룹 변경
+    function bulkSetGroup() {
+        var userIds = getSelectedUserIds();
+        if (userIds.length === 0) {
+            layui.layer.msg('선택된 사용자가 없습니다.', {icon: 2});
+            return;
+        }
+        
+        var groupId = document.getElementById('bulkGroupSelect').value;
+        if (!groupId) {
+            layui.layer.msg('그룹을 선택해주세요.', {icon: 2});
+            return;
+        }
+        
+        var groupName = document.getElementById('bulkGroupSelect').options[document.getElementById('bulkGroupSelect').selectedIndex].text;
+        
+        layui.layer.confirm('<strong>' + userIds.length + '명</strong>의 사용자를 <strong>' + groupName + '</strong> 그룹으로 변경하시겠습니까?', {
+            title: '일괄 그룹 변경',
+            btn: ['변경', '취소']
+        }, function(index) {
+            var loadingIndex = layui.layer.load(1, {shade: [0.3, '#000']});
+            
+            layui.jquery.ajax({
+                url: '/api/user_manage/bulk_action',
+                type: 'POST',
+                dataType: 'json',
+                data: {
+                    action: 'set_group',
+                    user_ids: JSON.stringify(userIds),
+                    group_id: groupId
+                },
+                success: function(resp) {
+                    layui.layer.close(loadingIndex);
+                    layui.layer.close(index);
+                    if (resp.code == 1) {
+                        layui.layer.msg(resp.msg, {icon: 1, time: 1500}, function() {
+                            location.reload();
+                        });
+                    } else {
+                        layui.layer.msg(resp.msg, {icon: 2});
+                    }
+                },
+                error: function() {
+                    layui.layer.close(loadingIndex);
+                    layui.layer.msg('요청 중 오류가 발생했습니다.', {icon: 2});
+                }
+            });
+        });
+    }
+    
+    // 일괄 활성화/비활성화
+    function bulkSetStatus(isActive) {
+        var userIds = getSelectedUserIds();
+        if (userIds.length === 0) {
+            layui.layer.msg('선택된 사용자가 없습니다.', {icon: 2});
+            return;
+        }
+        
+        var statusText = isActive ? '활성화' : '비활성화';
+        
+        layui.layer.confirm('<strong>' + userIds.length + '명</strong>의 사용자를 <strong>' + statusText + '</strong>하시겠습니까?', {
+            title: '일괄 ' + statusText,
+            btn: [statusText, '취소']
+        }, function(index) {
+            var loadingIndex = layui.layer.load(1, {shade: [0.3, '#000']});
+            
+            layui.jquery.ajax({
+                url: '/api/user_manage/bulk_action',
+                type: 'POST',
+                dataType: 'json',
+                data: {
+                    action: 'set_status',
+                    user_ids: JSON.stringify(userIds),
+                    is_active: isActive ? '1' : '0'
+                },
+                success: function(resp) {
+                    layui.layer.close(loadingIndex);
+                    layui.layer.close(index);
+                    if (resp.code == 1) {
+                        layui.layer.msg(resp.msg, {icon: 1, time: 1500}, function() {
+                            location.reload();
+                        });
+                    } else {
+                        layui.layer.msg(resp.msg, {icon: 2});
+                    }
+                },
+                error: function() {
+                    layui.layer.close(loadingIndex);
+                    layui.layer.msg('요청 중 오류가 발생했습니다.', {icon: 2});
+                }
+            });
+        });
+    }
+    
+    // 일괄 암호변경 모달 열기
+    function bulkChangePassword() {
+        // 모달 HTML 가져오기
+        var modalElement = document.getElementById('bulkPasswordModal');
+        if (!modalElement) {
+            layui.layer.msg('모달을 찾을 수 없습니다.', {icon: 2});
+            return;
+        }
+        var modalHtml = modalElement.innerHTML;
+        
+        // 모달 열기
+        layui.layer.open({
+            type: 1,
+            title: '그룹원 일괄 암호변경',
+            content: '<div style="padding: 20px;">' + modalHtml + '</div>',
+            area: ['500px', '500px'],
+            btn: false,
+            success: function(layero, index) {
+                // layui form 렌더링
+                layui.form.render();
+                
+                // 폼 초기화
+                var form = layero.find('#bulkPasswordForm')[0];
+                if (form) {
+                    form.reset();
+                }
+                
+                // 테이블에서 선택된 사용자 ID 목록 가져오기
+                var selectedUserIds = getSelectedUserIds();
+                
+                // 그룹원 체크박스 - 테이블에서 선택된 사용자만 체크
+                var selectAllCheckbox = layero.find('#selectAllGroupMembers')[0];
+                var memberCheckboxes = layero.find('.group-member-checkbox');
+                
+                memberCheckboxes.each(function() {
+                    var userId = this.value;
+                    // 선택된 사용자만 체크 (문자열 비교)
+                    this.checked = selectedUserIds.indexOf(userId) !== -1;
+                });
+                
+                // 전체 선택 체크박스 상태 업데이트
+                if (selectAllCheckbox) {
+                    var allChecked = memberCheckboxes.length > 0;
+                    memberCheckboxes.each(function() {
+                        if (!this.checked) allChecked = false;
+                    });
+                    selectAllCheckbox.checked = allChecked;
+                }
+                
+                layui.form.render('checkbox');
+                setTimeout(function() {
+                    updateGroupMembersCountInModal(layero);
+                }, 100);
+                
+                // 비밀번호 확인 필드 실시간 검증
+                layero.find('#bulkPasswordConfirm').on('blur', function() {
+                    var newPassword = layero.find('#bulkNewPassword').val();
+                    var passwordConfirm = $(this).val();
+                    if (passwordConfirm && newPassword !== passwordConfirm) {
+                        $(this).addClass('layui-form-danger');
+                        layui.layer.tips('비밀번호가 일치하지 않습니다.', this, {tips: 2});
+                    } else {
+                        $(this).removeClass('layui-form-danger');
+                    }
+                });
+                
+                setTimeout(function() {
+                    var passwordInput = layero.find('#bulkNewPassword')[0];
+                    if (passwordInput) {
+                        passwordInput.focus();
+                    }
+                }, 200);
+            }
+        });
+    }
+    
+    // 모달 내 그룹원 선택 수 업데이트
+    function updateGroupMembersCountInModal(layero) {
+        var checkedBoxes = layero.find('.group-member-checkbox:checked');
+        var count = checkedBoxes.length;
+        var countElement = layero.find('#selectedGroupMembersCount')[0];
+        if (countElement) {
+            countElement.textContent = count + '명 선택됨';
+        }
+    }
+    
+    // 그룹원 선택 수 업데이트
+    function updateGroupMembersCount() {
+        var checkedBoxes = document.querySelectorAll('.group-member-checkbox:checked');
+        var count = checkedBoxes.length;
+        var countElement = document.getElementById('selectedGroupMembersCount');
+        if (countElement) {
+            countElement.textContent = count + '명 선택됨';
+        }
+    }
+    
+    // 일괄 암호변경 모달 닫기
+    function closeBulkPasswordModal() {
+        layui.layer.closeAll();
+    }
     
     layui.use(['form','jquery','layer'], function () {
         var form   = layui.form;
@@ -223,6 +878,47 @@
         
         // 폼 렌더링 (select 등)
         form.render();
+        
+        // 전체 선택 체크박스
+        form.on('checkbox(checkAll)', function(data) {
+            var isChecked = data.elem.checked;
+            $('.user-checkbox').each(function() {
+                this.checked = isChecked;
+            });
+            form.render('checkbox');
+            updateSelectionUI();
+        });
+        
+        // 개별 체크박스
+        form.on('checkbox(userCheck)', function(data) {
+            var allCheckboxes = $('.user-checkbox');
+            var checkedCount = $('.user-checkbox:checked').length;
+            $('#checkAll').prop('checked', allCheckboxes.length === checkedCount && allCheckboxes.length > 0);
+            form.render('checkbox');
+            updateSelectionUI();
+        });
+        
+        // 네이티브 클릭 이벤트도 바인딩 (백업)
+        $(document).on('click', '.user-checkbox', function() {
+            setTimeout(function() {
+                var allCheckboxes = $('.user-checkbox');
+                var checkedCount = $('.user-checkbox:checked').length;
+                $('#checkAll').prop('checked', allCheckboxes.length === checkedCount && allCheckboxes.length > 0);
+                form.render('checkbox');
+                updateSelectionUI();
+            }, 10);
+        });
+        
+        $(document).on('click', '#checkAll', function() {
+            var isChecked = this.checked;
+            setTimeout(function() {
+                $('.user-checkbox').each(function() {
+                    this.checked = isChecked;
+                });
+                form.render('checkbox');
+                updateSelectionUI();
+            }, 10);
+        });
         
         // 페이지 로드 시 저장된 group_id가 있으면 select 초기 선택
         var savedGroupId = $('#group_id').val();
@@ -277,8 +973,10 @@
                     phone: $('#phone').val(),
                     membership_level: $('#membership_level').val(),
                     max_agents: $('#max_agents').val(),
+                    relay_server: $('#relay_server').val(),
                     is_active: $('#is_active').is(':checked') ? '1' : '0',
-                    is_admin: $('#is_admin').is(':checked') ? '1' : '0'
+                    is_admin: $('#is_admin').is(':checked') ? '1' : '0',
+                    is_group_admin: $('#is_group_admin').is(':checked') ? '1' : '0'
                 },
                 success: function(resp) {
                     if (resp.code == 1) {
@@ -299,6 +997,127 @@
             });
             return false;
         });
+        
+        // 그룹원 전체 선택 체크박스 이벤트 (이벤트 위임)
+        $(document).on('change', '#selectAllGroupMembers', function() {
+            var isChecked = this.checked;
+            var layero = $(this).closest('.layui-layer');
+            if (layero.length === 0) {
+                layero = $('.layui-layer').last();
+            }
+            var memberCheckboxes = layero.find('.group-member-checkbox');
+            memberCheckboxes.each(function() {
+                this.checked = isChecked;
+            });
+            layui.form.render('checkbox');
+            updateGroupMembersCountInModal(layero);
+        });
+        
+        // 그룹원 개별 체크박스 이벤트 (이벤트 위임)
+        $(document).on('change', '.group-member-checkbox', function() {
+            var layero = $(this).closest('.layui-layer');
+            if (layero.length === 0) {
+                layero = $('.layui-layer').last();
+            }
+            updateGroupMembersCountInModal(layero);
+            // 전체 선택 체크박스 상태 업데이트
+            var allChecked = layero.find('.group-member-checkbox:checked').length === layero.find('.group-member-checkbox').length;
+            layero.find('#selectAllGroupMembers').prop('checked', allChecked);
+        });
+        
+        // 일괄 암호변경 폼 제출
+        form.on('submit(bulkPasswordSubmit)', function(data) {
+            // 모달 내의 요소 찾기
+            var layero = $('.layui-layer').last();
+            var userIds = [];
+            
+            // 그룹관리자인 경우 모달의 체크박스에서 선택된 ID 가져오기
+            var groupMemberCheckboxes = layero.find('.group-member-checkbox:checked');
+            if (groupMemberCheckboxes.length > 0) {
+                // 그룹관리자: 모달의 체크박스에서 선택된 ID
+                groupMemberCheckboxes.each(function() {
+                    userIds.push(parseInt($(this).val()));
+                });
+            } else {
+                // 최고관리자: 테이블에서 선택된 ID
+                userIds = getSelectedUserIds();
+            }
+            
+            if (userIds.length === 0) {
+                layui.layer.msg('선택된 사용자가 없습니다.', {icon: 2});
+                return false;
+            }
+            
+            var newPassword = layero.find('#bulkNewPassword').val();
+            var passwordConfirm = layero.find('#bulkPasswordConfirm').val();
+            
+            if (!newPassword) {
+                layui.layer.msg('비밀번호를 입력해주세요.', {icon: 2});
+                return false;
+            }
+            
+            if (newPassword.length < 8 || newPassword.length > 20) {
+                layui.layer.msg('비밀번호는 8~20자여야 합니다.', {icon: 2});
+                return false;
+            }
+            
+            if (newPassword !== passwordConfirm) {
+                layui.layer.msg('비밀번호가 일치하지 않습니다.', {icon: 2});
+                return false;
+            }
+            
+            // 카카오톡 알림 옵션이 포함된 확인 다이얼로그
+            var confirmContent = '<div style="padding: 10px 0;">' +
+                '<p style="margin-bottom: 15px;"><strong>' + userIds.length + '명</strong>의 사용자 비밀번호를 변경하시겠습니까?</p>' +
+                '<div style="padding: 10px; background: #f8f8f8; border-radius: 4px;">' +
+                '<label style="display: flex; align-items: center; cursor: pointer;">' +
+                '<input type="checkbox" id="notifyKakao" style="margin-right: 8px;">' +
+                '<i class="layui-icon" style="color: #FEE500; font-size: 20px; margin-right: 5px;">&#xe606;</i>' +
+                '<span>카카오톡으로 알림 보내기</span>' +
+                '</label>' +
+                '<div style="font-size: 12px; color: #999; margin-top: 5px; margin-left: 28px;">휴대전화 번호가 등록된 사용자에게만 발송됩니다.</div>' +
+                '</div>' +
+                '</div>';
+            
+            layui.layer.confirm(confirmContent, {
+                title: '일괄 암호변경 확인',
+                btn: ['변경', '취소']
+            }, function(index) {
+                var notifyKakao = layui.jquery('#notifyKakao').is(':checked');
+                var loadingIndex = layui.layer.load(1, {shade: [0.3, '#000']});
+                
+                layui.jquery.ajax({
+                    url: '/api/user_manage/bulk_action',
+                    type: 'POST',
+                    dataType: 'json',
+                    data: {
+                        action: 'change_password',
+                        user_ids: JSON.stringify(userIds),
+                        new_password: newPassword,
+                        notify_kakao: notifyKakao ? '1' : '0'
+                    },
+                    success: function(resp) {
+                        layui.layer.close(loadingIndex);
+                        layui.layer.close(index);
+                        layui.layer.closeAll(); // 모달 닫기
+                        if (resp.code == 1) {
+                            layui.layer.msg(resp.msg, {icon: 1, time: 1500}, function() {
+                                location.reload();
+                            });
+                        } else {
+                            layui.layer.msg(resp.msg, {icon: 2});
+                        }
+                    },
+                    error: function() {
+                        layui.layer.close(loadingIndex);
+                        layui.layer.msg('요청 중 오류가 발생했습니다.', {icon: 2});
+                    }
+                });
+            });
+            
+            return false;
+        });
+        
     });
     
     // 관리자 권한 토글
@@ -356,6 +1175,152 @@
                     },
                     error: function() {
                         layer.msg('요청 중 오류가 발생했습니다.', {icon: 2});
+                    }
+                });
+            });
+        });
+    }
+
+    // 릴레이 서버 관리 팝업
+    function manageRelayServers() {
+        layui.use(['layer', 'table', 'form'], function() {
+            var layer = layui.layer;
+            var table = layui.table;
+            var form = layui.form;
+            var $ = layui.jquery;
+
+            layer.open({
+                type: 1,
+                title: '릴레이 서버 관리',
+                area: ['600px', '500px'],
+                content: '<div style="padding: 20px;">' +
+                         '  <form class="layui-form" id="relayForm">' +
+                         '    <div class="layui-form-item">' +
+                         '      <div class="layui-input-inline" style="width: 150px;">' +
+                         '        <input type="text" name="address" required lay-verify="required" lay-reqtext="서버 주소를 입력해주세요." placeholder="서버 주소" class="layui-input">' +
+                         '      </div>' +
+                         '      <div class="layui-input-inline" style="width: 100px;">' +
+                         '        <input type="text" name="name" placeholder="서버 이름" class="layui-input">' +
+                         '      </div>' +
+                         '      <div class="layui-input-inline" style="width: 150px;">' +
+                         '        <input type="text" name="public_key" placeholder="퍼블릭 키 (Key)" class="layui-input">' +
+                         '      </div>' +
+                         '      <div class="layui-input-inline" style="width: 60px;">' +
+                         '        <button class="layui-btn" lay-submit lay-filter="addRelay">추가</button>' +
+                         '      </div>' +
+                         '    </div>' +
+                         '  </form>' +
+                         '  <table id="relayTable" lay-filter="relayTable"></table>' +
+                         '</div>',
+                success: function(layero, index) {
+                    // 테이블 렌더링
+                    table.render({
+                        elem: '#relayTable',
+                        url: '/api/relay_server/list',
+                        cols: [[
+                            {field: 'server_address', title: '서버 주소', width: 150},
+                            {field: 'server_name', title: '이름', width: 100},
+                            {field: 'public_key', title: '퍼블릭 키', width: 150},
+                            {field: 'is_default', title: '기본', width: 60, align: 'center', templet: function(d) {
+                                return '<input type="radio" name="is_default_radio" value="' + d.id + '" ' + (d.is_default ? 'checked' : '') + ' lay-filter="setDefaultRelay">';
+                            }},
+                            {title: '작업', width: 60, templet: function(d) {
+                                return '<button class="layui-btn layui-btn-xs layui-btn-danger" onclick="deleteRelay(' + d.id + ')">삭제</button>';
+                            }}
+                        ]],
+                        page: false,
+                        size: 'sm',
+                        text: {
+                            none: '등록된 릴레이 서버가 없습니다.'
+                        }
+                    });
+
+                    // 추가 폼 제출
+                    form.on('submit(addRelay)', function(data) {
+                        $.ajax({
+                            url: '/api/relay_server/add',
+                            type: 'POST',
+                            data: data.field,
+                            success: function(resp) {
+                                if (resp.code == 1) {
+                                    layer.msg(resp.msg, {icon: 1, time: 1000});
+                                    table.reload('relayTable');
+                                    $('#relayForm')[0].reset();
+                                } else {
+                                    layer.msg(resp.msg, {icon: 2});
+                                }
+                            }
+                        });
+                        return false;
+                    });
+
+                    // 기본값 라디오 버튼 클릭 이벤트
+                    form.on('radio(setDefaultRelay)', function(data) {
+                        var id = data.value;
+                        $.ajax({
+                            url: '/api/relay_server/set_default/' + id,
+                            type: 'POST',
+                            headers: {
+                                'X-CSRFToken': $('input[name="csrfmiddlewaretoken"]').val()
+                            },
+                            success: function(resp) {
+                                if (resp.code == 1) {
+                                    layer.msg(resp.msg, {icon: 1, time: 1000});
+                                    table.reload('relayTable');
+                                } else {
+                                    layer.msg(resp.msg, {icon: 2});
+                                }
+                            }
+                        });
+                    });
+                }
+            });
+        });
+    }
+
+    // 릴레이 서버 기본값 설정
+    window.setDefaultRelay = function(id) {
+        layui.use(['layer', 'table'], function() {
+            var layer = layui.layer;
+            var table = layui.table;
+            layui.jquery.ajax({
+                url: '/api/relay_server/set_default/' + id,
+                type: 'POST',
+                success: function(resp) {
+                    if (resp.code == 1) {
+                        layer.msg(resp.msg, {icon: 1, time: 1000});
+                        table.reload('relayTable');
+                    } else {
+                        layer.msg(resp.msg, {icon: 2});
+                    }
+                }
+            });
+        });
+    }
+
+    // 릴레이 서버 삭제 (전역 함수로 등록)
+    window.deleteRelay = function(id) {
+        layui.use(['layer', 'table'], function() {
+            var layer = layui.layer;
+            var table = layui.table;
+            layer.confirm('이 릴레이 서버를 삭제하시겠습니까?', {
+                title: '확인',
+                btn: ['삭제', '취소']
+            }, function(index) {
+                layui.jquery.ajax({
+                    url: '/api/relay_server/delete/' + id,
+                    type: 'POST',
+                    headers: {
+                        'X-CSRFToken': layui.jquery('input[name="csrfmiddlewaretoken"]').val()
+                    },
+                    success: function(resp) {
+                        layer.close(index);
+                        if (resp.code == 1) {
+                            layer.msg(resp.msg, {icon: 1, time: 1000});
+                            table.reload('relayTable');
+                        } else {
+                            layer.msg(resp.msg, {icon: 2});
+                        }
                     }
                 });
             });

@@ -4,78 +4,331 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" href="{% static 'favicon.ico' %}">
-    <title>로그인_【MDeskWeb】</title>
+    <title>로그인 | MDesk</title>
         <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-neo.css" rel="stylesheet">
         <link rel="stylesheet" href="{% static 'layui/css/layui.css' %}">
-        <link rel="stylesheet" href="{% static 'layui/css/style.css' %}">
         <style>
             * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
                 font-family: 'NanumSquareNeo', 'Nanum Square Neo', sans-serif !important;
             }
-        </style>
 
- 
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 배경 장식 원 */
+        body::before {
+            content: '';
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            border-radius: 50%;
+            top: -200px;
+            right: -100px;
+            opacity: 0.3;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        body::after {
+            content: '';
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: linear-gradient(135deg, #00d9ff 0%, #00b4d8 100%);
+            border-radius: 50%;
+            bottom: -150px;
+            left: -100px;
+            opacity: 0.3;
+            animation: float 8s ease-in-out infinite reverse;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-30px) rotate(5deg); }
+        }
+
+        .login-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 420px;
+            padding: 20px;
+        }
+
+        .login-main {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 50px 40px;
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(255, 255, 255, 0.1);
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo-section {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        .logo-section img {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(233, 69, 96, 0.3);
+            margin-bottom: 15px;
+            transition: transform 0.3s ease;
+        }
+
+        .logo-section img:hover {
+            transform: scale(1.05) rotate(-3deg);
+        }
+
+        .logo-section h1 {
+            font-size: 28px;
+            font-weight: 800;
+            color: #1a1a2e;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-section p {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .layui-form {
+            margin-top: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #444;
+            margin-bottom: 8px;
+        }
+
+        .input-group .layui-input {
+            width: 100%;
+            height: 50px;
+            padding: 0 20px;
+            border: 2px solid #e8e8e8;
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            background: #fafafa;
+        }
+
+        .input-group .layui-input:focus {
+            border-color: #e94560;
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(233, 69, 96, 0.1);
+            outline: none;
+        }
+
+        .input-group .layui-input::placeholder {
+            color: #aaa;
+        }
+
+        .login-btn {
+            margin-top: 30px;
+        }
+
+        .login-btn .layui-btn {
+            width: 100%;
+            height: 52px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(233, 69, 96, 0.3);
+        }
+
+        .login-btn .layui-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(233, 69, 96, 0.4);
+        }
+
+        .login-btn .layui-btn:active {
+            transform: translateY(0);
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 30px 0;
+            color: #999;
+            font-size: 13px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e8e8e8;
+        }
+
+        .divider span {
+            padding: 0 15px;
+        }
+
+        .links {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .links a {
+            font-size: 14px;
+            color: #666;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .links a:hover {
+            color: #e94560;
+            background: rgba(233, 69, 96, 0.08);
+        }
+
+        .links a.primary {
+            color: #e94560;
+            font-weight: 600;
+        }
+
+        /* 반응형 */
+        @media (max-width: 480px) {
+            .login-main {
+                padding: 40px 25px;
+                border-radius: 20px;
+            }
+
+            .logo-section img {
+                width: 70px;
+                height: 70px;
+            }
+
+            .logo-section h1 {
+                font-size: 24px;
+            }
+
+            .input-group .layui-input {
+                height: 48px;
+            }
+
+            .login-btn .layui-btn {
+                height: 48px;
+            }
+        }
+    </style>
 </head>
 <body>
  
+<div class="login-container">
 <div class="login-main">
-    <header class="layui-elip">로그인</header>
-    <form class="layui-form">
-        <div class="layui-input-inline">
-            <input type="text" name="account" required lay-verify="required" lay-reqtext="사용자명을 입력해주세요" placeholder="사용자명" autocomplete="off"
-                   class="layui-input">
+        <div class="logo-section">
+            <h1>MDesk</h1>
+            <p>원격 데스크톱 제어 솔루션</p>
         </div>
-        <div class="layui-input-inline">
-            <input type="password" name="password" required lay-verify="required" lay-reqtext="비밀번호를 입력해주세요" placeholder="비밀번호" autocomplete="off"
-                   class="layui-input">
+        
+        <form class="layui-form">
+            <div class="input-group">
+                <label>사용자명</label>
+                <input type="text" name="account" required lay-verify="required" 
+                       lay-reqtext="사용자명을 입력해주세요" placeholder="사용자명을 입력하세요" 
+                       autocomplete="off" class="layui-input">
+            </div>
+            
+            <div class="input-group">
+                <label>비밀번호</label>
+                <input type="password" name="password" required lay-verify="required" 
+                       lay-reqtext="비밀번호를 입력해주세요" placeholder="비밀번호를 입력하세요" 
+                       autocomplete="off" class="layui-input">
         </div>
-        <div class="layui-input-inline login-btn">
+            
+            <div class="login-btn">
             <button lay-submit lay-filter="login" class="layui-btn">로그인</button>
         </div>
-        <hr/>
-        <p><a href="/api/user_action?action=register" class="fl">회원가입</a><a href="javascript:;" class="fr">비밀번호 찾기</a></p>
+            
+            <div class="divider">
+                <span>또는</span>
+            </div>
+            
+            <div class="links">
+                <a href="/api/user_action?action=register" class="primary">회원가입</a>
+                <a href="javascript:;" class="find-password">비밀번호 찾기</a>
+            </div>
     </form>
+    </div>
 </div>
  
- 
-<script src={% static "layui/layui.js" %}></script>
+<script src="{% static 'layui/layui.js' %}"></script>
 <script type="text/javascript">
     layui.use(['form','layer','jquery'], function () {
-        // LayUI 전역 설정 - 한자 제거
         layui.layer.config({
             anim: 0,
             btn: ['확인'],
             title: '알림'
         });
  
-        // 操作对象
         var form = layui.form;
         var $ = layui.jquery;
-        form.on('submit(login)',function (data) {
-            console.log(data.field);
+        
+        form.on('submit(login)', function (data) {
             $.ajax({
-                url:'/api/user_action?action=login',
-                data:data.field,
-                dataType:'json',
-                type:'post',
-
+                url: '/api/user_action?action=login',
+                data: data.field,
+                dataType: 'json',
+                type: 'post',
                 success: function(resp) {
-		    			if(resp.code==1) {
-		    				//layer.alert(resp.msg,{icon:1});
+                    if(resp.code == 1) {
                             location.href = resp.url;
 		    			} else {
-		    				layer.alert(resp.msg,{icon:5, title:'알림', btn:['확인']});
+                        layer.alert(resp.msg, {icon: 5, title: '알림', btn: ['확인']});
 		    			}
                 }
-            })
+            });
             return false;
-        })
-        $('.fr').on('click', function(){
+        });
+        
+        $('.find-password').on('click', function(){
             location.href = '/api/user_action?action=find_password';
-        })
-
- 
+        });
     });
 </script>
 </body>

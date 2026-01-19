@@ -20,7 +20,7 @@
             <div class="layui-form-item">
               <label class="layui-form-label">회사명 <span style="color:red;">*</span></label>
               <div class="layui-input-block">
-                <input type="text" id="company_name" name="company_name" value="{% if edit_group %}{{edit_group.company_name}}{% endif %}" lay-verify="required" placeholder="회사명을 입력하세요" autocomplete="off" class="layui-input">
+                <input type="text" id="company_name" name="company_name" value="{% if edit_group %}{{edit_group.company_name}}{% endif %}" lay-verify="required" lay-reqtext="회사명을 입력해주세요." placeholder="회사명을 입력하세요" autocomplete="off" class="layui-input">
               </div>
             </div>
             

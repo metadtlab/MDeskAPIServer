@@ -15,6 +15,205 @@
     <style>
         * {
             font-family: 'NanumSquareNeo', 'Nanum Square Neo', sans-serif !important;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            min-height: 100vh;
+        }
+
+        /* 네비게이션 바 스타일 */
+        .nav-container {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .nav-wrapper {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .layui-nav {
+            background: transparent !important;
+            padding: 0;
+        }
+
+        .layui-nav .layui-nav-item {
+            line-height: 60px;
+        }
+
+        .layui-nav .layui-nav-item a {
+            color: rgba(255, 255, 255, 0.85) !important;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 0 18px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .layui-nav .layui-nav-item a:hover {
+            color: #fff !important;
+            background: rgba(255, 255, 255, 0.1) !important;
+        }
+
+        .layui-nav .layui-nav-item a::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 3px;
+            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+            border-radius: 3px 3px 0 0;
+        }
+
+        .layui-nav .layui-nav-item a:hover::after,
+        .layui-nav .layui-this a::after {
+            width: 80%;
+        }
+
+        .layui-nav .layui-this {
+            background: transparent !important;
+        }
+
+        .layui-nav .layui-this a {
+            color: #fff !important;
+        }
+
+        /* 드롭다운 메뉴 */
+        .layui-nav .layui-nav-child {
+            background: #1a1a2e !important;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 5px;
+            overflow: hidden;
+        }
+
+        .layui-nav .layui-nav-child dd a {
+            color: rgba(255, 255, 255, 0.8) !important;
+            padding: 12px 20px !important;
+            font-size: 13px;
+        }
+
+        .layui-nav .layui-nav-child dd a:hover {
+            background: rgba(233, 69, 96, 0.2) !important;
+            color: #fff !important;
+        }
+
+        .layui-nav .layui-nav-child dd a::after {
+            display: none;
+        }
+
+        /* 로고/브랜드 */
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 20px 0 0;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .nav-brand img {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+        }
+
+        /* 로그아웃 버튼 특별 스타일 */
+        .layui-nav .layui-nav-item.logout-btn a {
+            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            border-radius: 20px;
+            padding: 8px 20px;
+            margin: 12px 0;
+            line-height: normal;
+            display: inline-block;
+        }
+
+        .layui-nav .layui-nav-item.logout-btn a:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(233, 69, 96, 0.4);
+        }
+
+        .layui-nav .layui-nav-item.logout-btn a::after {
+            display: none;
+        }
+
+        /* 메인 컨텐츠 영역 */
+        .main-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        /* 섹션 타이틀 */
+        .section-title {
+            background: white;
+            border-radius: 12px;
+            padding: 20px 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border-left: 4px solid #e94560;
+        }
+
+        .section-title h2 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin: 0;
+        }
+
+        /* layui 필드셋 스타일 오버라이드 */
+        .layui-elem-field {
+            margin-top: 0 !important;
+            border: none !important;
+        }
+
+        .layui-field-title {
+            border: none !important;
+        }
+
+        .layui-field-title legend {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a2e;
+            background: white;
+            padding: 20px 25px;
+            margin: 0 0 25px 0;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border-left: 4px solid #e94560;
+            display: block;
+            width: 100%;
+        }
+
+        /* 반응형 */
+        @media (max-width: 768px) {
+            .layui-nav .layui-nav-item a {
+                padding: 0 12px;
+                font-size: 13px;
+            }
+
+            .nav-brand {
+                font-size: 16px;
+            }
+
+            .nav-brand img {
+                width: 30px;
+                height: 30px;
+            }
         }
     </style>
     {% block link %}{% endblock %}
@@ -24,47 +223,64 @@
     <script src={% static "layui/layui.js" %}></script>
     <script>
         layui.use('element', function () {
-            var element = layui.element; //导航的hover效果、二级菜单等功能，需要依赖element模块
-
-            //监听导航点击
+            var element = layui.element;
             element.on('nav(demo)', function (elem) {
-                //console.log(elem)
                 layer.msg(elem.text());
             });
         });
     </script>
 
-    <ul class="layui-nav">
-        <li class="layui-nav-item"><a href="/">홈</a></li>
-        {% if u.is_admin %}
-        <li class="layui-nav-item"><a href="/api/work?show_type=admin">전체 기기</a>
-        </li>
-        {% endif %}
-        <li class="layui-nav-item"><a href="/api/share">공유</a></li>
+    <div class="nav-container">
+        <div class="nav-wrapper">
+            <ul class="layui-nav" lay-filter="demo">
+                <li class="layui-nav-item" style="margin-right: 10px;">
+                    <a href="/" class="nav-brand">
+                        대시보드
+                    </a>
+                </li>
+                {% if u.is_admin %}
+                <li class="layui-nav-item">
+                    <a href="javascript:;">전체 기기</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="/api/work?show_type=admin">기기 현황</a></dd>
+                        <dd><a href="/api/device_manage">기기 관리</a></dd>
+                        <dd><a href="/api/token_manage">토큰 관리</a></dd>
+                        <dd><a href="/api/peer_manage">Peers 관리</a></dd>
+                    </dl>
+                </li>
+                {% endif %}
+                <li class="layui-nav-item"><a href="/api/share">공유</a></li>
+                {% if u.is_admin %}
+                <li class="layui-nav-item">
+                    <a href="javascript:;">로그</a>
+                    <dl class="layui-nav-child">
+                        <dd><a href="/api/conn_log">연결 로그</a></dd>
+                        <dd><a href="/api/file_log">파일 전송 로그</a></dd>
+                    </dl>
+                </li>
+                {% endif %}
+                {% if u.is_superuser %}
+                <li class="layui-nav-item"><a href="/api/group_manage">그룹관리</a></li>
+                <li class="layui-nav-item"><a href="/api/user_manage">사용자관리</a></li>
+                {% elif u.is_group_admin %}
+                <li class="layui-nav-item"><a href="/api/user_manage">사용자관리</a></li>
+                {% endif %}
+                <li class="layui-nav-item"><a href="/api/custom_app">나만의 원격</a></li>
+                <li class="layui-nav-item"><a href="/api/user_action?action=edit_profile">내 정보</a></li>
+                {% if u.membership_level != 'free' %}
+                <li class="layui-nav-item"><a href="/executables/MDesk_portable.exe" download="MDesk_portable.exe">관리자 다운로드</a></li>
+                {% endif %}
+                <li class="layui-nav-item logout-btn"><a href="/api/user_action?action=logout">로그아웃</a></li>
+            </ul>
+        </div>
+    </div>
 
-        {% if u.is_admin %}
-        <li class="layui-nav-item">
-            <a href="">로그</a>
-            <dl class="layui-nav-child">
-                <dd><a href="/api/conn_log">연결 로그</a></dd>
-                <dd><a href="/api/file_log">파일 전송 로그</a></dd>
-            </dl>
-        </li>
-        <li class="layui-nav-item"><a href="/administrator/" target="_blank">관리자 페이지</a></li>
-        {% endif %}
-        {% if u.is_superuser %}
-        <li class="layui-nav-item"><a href="/api/group_manage">그룹관리</a></li>
-        <li class="layui-nav-item"><a href="/api/user_manage">사용자관리</a></li>
-        {% endif %}
-        <li class="layui-nav-item"><a href="/api/custom_app">나만의 원격</a></li>
-        <li class="layui-nav-item"><a href="/api/user_action?action=edit_profile">내정보 수정</a></li>
-        <li class="layui-nav-item"><a href="/api/user_action?action=logout" target="_blank">로그아웃</a></li>
-    </ul>
-
-    <fieldset class="layui-elem-field layui-field-title" style="margin-top: 20px;">
-        <legend>{% block legend_name %}{% endblock %}</legend>
-    </fieldset>
-    {% block content %}{% endblock %}
+    <div class="main-content">
+        <fieldset class="layui-elem-field layui-field-title">
+            <legend>{% block legend_name %}{% endblock %}</legend>
+        </fieldset>
+        {% block content %}{% endblock %}
+    </div>
 </body>
 
 </html>

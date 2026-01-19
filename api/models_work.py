@@ -96,7 +96,7 @@ class RustDesDeviceAdmin(admin.ModelAdmin):
 
 
 class ConnLog(models.Model):
-    id = models.IntegerField(verbose_name='ID', primary_key=True)
+    id = models.AutoField(verbose_name='ID', primary_key=True)
     action = models.CharField(verbose_name='Action', max_length=20, null=True)
     conn_id = models.CharField(verbose_name='Connection ID', max_length=10, null=True)
     from_ip = models.CharField(verbose_name='From IP', max_length=30, null=True)
@@ -115,7 +115,7 @@ class ConnLogAdmin(admin.ModelAdmin):
 
 
 class FileLog(models.Model):
-    id = models.IntegerField(verbose_name='ID', primary_key=True)
+    id = models.AutoField(verbose_name='ID', primary_key=True)
     file = models.CharField(verbose_name='Path', max_length=500)
     remote_id = models.CharField(verbose_name='Remote ID', max_length=20, default='0')
     user_id = models.CharField(verbose_name='User ID', max_length=20, default='0')

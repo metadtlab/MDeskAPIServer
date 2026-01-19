@@ -2,6 +2,39 @@
 {% load my_filters %}
 {% block title %}MDesk WebUI{% endblock %}
 {% block legend_name %}대시보드{% endblock %}
+{% block link %}
+<style>
+  .sortable-table th {
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+    transition: background-color 0.2s;
+  }
+  .sortable-table th:hover {
+    background-color: #f0f0f0;
+  }
+  .sortable-table th::after {
+    content: '⇅';
+    position: absolute;
+    right: 8px;
+    opacity: 0.3;
+    font-size: 12px;
+  }
+  .sortable-table th.sort-asc::after {
+    content: '↑';
+    opacity: 1;
+    color: #1890ff;
+  }
+  .sortable-table th.sort-desc::after {
+    content: '↓';
+    opacity: 1;
+    color: #1890ff;
+  }
+  .sortable-table th {
+    padding-right: 25px !important;
+  }
+</style>
+{% endblock %}
 {% block content %}
 <div style="padding: 20px; background-color: #F2F2F2;">
   <div class="layui-row layui-col-space15">
@@ -10,23 +43,23 @@
       <div class="layui-card">
         <div class="layui-card-header">기기 통계 - 【사용자명:{{u.username}}】</div>
         <div class="layui-card-body">
-          <table class="layui-table">
+          <table class="layui-table sortable-table" id="userDeviceTable">
             <thead>
               <tr>
-                <th>클라이언트 ID</th>
-                <th>버전</th>
-                <th>연결 비밀번호</th>
-                <th>시스템 사용자명</th>
-                <th>컴퓨터명</th>
-                <th>별칭</th>
-                <th>플랫폼</th>
-                <th>시스템</th>
-                <th>CPU</th>
-                <th>메모리</th>
-                <th>IP</th>
-                <th>등록 시간</th>
-                <th>업데이트 시간</th>
-                <th>상태</th>
+                <th data-sort="string">클라이언트 ID</th>
+                <th data-sort="string">버전</th>
+                <th data-sort="string">연결 비밀번호</th>
+                <th data-sort="string">시스템 사용자명</th>
+                <th data-sort="string">컴퓨터명</th>
+                <th data-sort="string">별칭</th>
+                <th data-sort="string">플랫폼</th>
+                <th data-sort="string">시스템</th>
+                <th data-sort="string">CPU</th>
+                <th data-sort="string">메모리</th>
+                <th data-sort="string">IP</th>
+                <th data-sort="date">등록 시간</th>
+                <th data-sort="date">업데이트 시간</th>
+                <th data-sort="string">상태</th>
               </tr>
             </thead>
             <tbody>
@@ -80,22 +113,22 @@
           <div class="layui-btn" ><a href="/api/down_peers">xlsx 내보내기</a></div>
         </div>
         <div class="layui-card-body">
-          <table class="layui-table">
+          <table class="layui-table sortable-table" id="adminDeviceTable">
             <thead>
               <tr>
-                <th>클라이언트 ID</th>
-                <th>소유 사용자</th>
-                <th>버전</th>
-                <th>시스템 사용자명</th>
-                <th>컴퓨터명</th>
-                <th>시스템</th>
-                <th>CPU</th>
-                <th>메모리</th>
-                <th>IP</th>
-                <th>최근 상담원 번호</th>
-                <th>등록 일자</th>
-                <th>업데이트 시간</th>
-                <th>상태</th>
+                <th data-sort="string">클라이언트 ID</th>
+                <th data-sort="string">소유 사용자</th>
+                <th data-sort="string">버전</th>
+                <th data-sort="string">시스템 사용자명</th>
+                <th data-sort="string">컴퓨터명</th>
+                <th data-sort="string">시스템</th>
+                <th data-sort="string">CPU</th>
+                <th data-sort="string">메모리</th>
+                <th data-sort="string">IP</th>
+                <th data-sort="string">최근 상담원 번호</th>
+                <th data-sort="date">등록 일자</th>
+                <th data-sort="date">업데이트 시간</th>
+                <th data-sort="string">상태</th>
               </tr>
             </thead>
             <tbody>
@@ -146,5 +179,61 @@
 
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 정렬 가능한 테이블 초기화
+    document.querySelectorAll('.sortable-table').forEach(function(table) {
+        var headers = table.querySelectorAll('th');
+        
+        headers.forEach(function(header, index) {
+            header.addEventListener('click', function() {
+                var sortType = header.getAttribute('data-sort');
+                var tbody = table.querySelector('tbody');
+                var rows = Array.from(tbody.querySelectorAll('tr'));
+                var isAsc = header.classList.contains('sort-asc');
+                
+                // 모든 헤더의 정렬 클래스 제거
+                headers.forEach(function(h) {
+                    h.classList.remove('sort-asc', 'sort-desc');
+                });
+                
+                // 현재 헤더에 정렬 클래스 추가
+                if (isAsc) {
+                    header.classList.add('sort-desc');
+                } else {
+                    header.classList.add('sort-asc');
+                }
+                
+                // 정렬
+                rows.sort(function(a, b) {
+                    var aVal = a.cells[index].textContent.trim();
+                    var bVal = b.cells[index].textContent.trim();
+                    
+                    if (sortType === 'date') {
+                        aVal = new Date(aVal) || 0;
+                        bVal = new Date(bVal) || 0;
+                    } else if (sortType === 'number') {
+                        aVal = parseFloat(aVal) || 0;
+                        bVal = parseFloat(bVal) || 0;
+                    } else {
+                        aVal = aVal.toLowerCase();
+                        bVal = bVal.toLowerCase();
+                    }
+                    
+                    if (aVal < bVal) return isAsc ? 1 : -1;
+                    if (aVal > bVal) return isAsc ? -1 : 1;
+                    return 0;
+                });
+                
+                // 정렬된 행 다시 추가
+                rows.forEach(function(row) {
+                    tbody.appendChild(row);
+                });
+            });
+        });
+    });
+});
+</script>
 
 {% endblock %}

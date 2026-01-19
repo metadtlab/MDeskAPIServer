@@ -62,9 +62,11 @@ class UserProfile(AbstractBaseUser, PermissionsMixin):
     membership_start = models.DateField(verbose_name=_('이용 시작일'), blank=True, null=True)
     membership_expires = models.DateField(verbose_name=_('이용 만료일'), blank=True, null=True)
     max_agents = models.IntegerField(verbose_name=_('최대 상담원 수'), default=3)
+    relay_server = models.CharField(verbose_name=_('릴레이 서버'), max_length=100, blank=True, default='222.239.231.91')
     
     is_active = models.BooleanField(verbose_name=_('활성화 여부'), default=True)
     is_admin = models.BooleanField(verbose_name=_('관리자 여부'), default=False)
+    is_group_admin = models.BooleanField(verbose_name=_('그룹 관리자 여부'), default=False)
 
     objects = MyUserManager()
  
@@ -232,4 +234,99 @@ class TeamMember(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.phone})"
+
+class RelayServer(models.Model):
+    """릴레이 서버 목록"""
+    server_address = models.CharField(verbose_name=_('서버 주소'), max_length=100, unique=True)
+    server_name = models.CharField(verbose_name=_('서버 이름'), max_length=100, blank=True, default='')
+    public_key = models.CharField(verbose_name=_('퍼블릭 키'), max_length=200, blank=True, default='')
+    is_default = models.BooleanField(verbose_name=_('기본값 여부'), default=False)
+    is_active = models.BooleanField(verbose_name=_('활성화 여부'), default=True)
+    create_time = models.DateTimeField(verbose_name=_('생성 시간'), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("릴레이 서버")
+        verbose_name_plural = _("릴레이 서버 목록")
+        ordering = ['-is_default', '-create_time']
+
+    def __str__(self):
+        return self.server_name if self.server_name else self.server_address
+
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            # 다른 모든 서버의 기본값 해제
+            RelayServer.objects.filter(is_default=True).update(is_default=False)
+        super().save(*args, **kwargs)
+
+
+class RemoteAuthLog(models.Model):
+    """원격 사용자 인증 로그"""
+    user = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, verbose_name=_('사용자'), null=True, blank=True)
+    username = models.CharField(verbose_name=_('아이디'), max_length=50)
+    remote_id = models.CharField(verbose_name=_('원격지 ID'), max_length=50, blank=True, default='')
+    remote_hostname = models.CharField(verbose_name=_('원격지 호스트명'), max_length=100, blank=True, default='')
+    client_ip = models.CharField(verbose_name=_('클라이언트 IP'), max_length=50, blank=True, default='')
+    user_agent = models.CharField(verbose_name=_('User Agent'), max_length=500, blank=True, default='')
+    success = models.BooleanField(verbose_name=_('성공 여부'), default=True)
+    memo = models.CharField(verbose_name=_('메모'), max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(verbose_name=_('인증 시간'), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("원격 인증 로그")
+        verbose_name_plural = _("원격 인증 로그 목록")
+        ordering = ['-created_at']
+
+    def __str__(self):
+        status = "성공" if self.success else "실패"
+        return f"{self.username} -> {self.remote_id} ({status}) - {self.created_at}"
+
+
+class MdeskDeviceRegistration(models.Model):
+    """MDesk 기기 등록 정보"""
+    remote_id = models.CharField(verbose_name=_('원격 ID'), max_length=60)
+    custom_id = models.CharField(verbose_name=_('사용자 ID'), max_length=50, blank=True, default='')
+    user_pkid = models.CharField(verbose_name=_('사용자 고유번호'), max_length=20, blank=True, default='')
+    agent_id = models.CharField(verbose_name=_('상담원 번호'), max_length=10, blank=True, default='')
+    alias = models.CharField(verbose_name=_('별칭'), max_length=100, blank=True, default='')
+    platform = models.CharField(verbose_name=_('플랫폼'), max_length=50, blank=True, default='')
+    uuid = models.CharField(verbose_name='UUID', max_length=200, blank=True, default='')
+    version = models.CharField(verbose_name=_('버전'), max_length=50, blank=True, default='')
+    hostname = models.CharField(verbose_name=_('호스트명'), max_length=100, blank=True, default='')
+    client_ip = models.CharField(verbose_name=_('클라이언트 IP'), max_length=50, blank=True, default='')
+    user_agent = models.CharField(verbose_name=_('User Agent'), max_length=500, blank=True, default='')
+    is_active = models.BooleanField(verbose_name=_('활성화'), default=True)
+    created_at = models.DateTimeField(verbose_name=_('등록 시간'), auto_now_add=True)
+    updated_at = models.DateTimeField(verbose_name=_('업데이트 시간'), auto_now=True)
+
+    class Meta:
+        verbose_name = _("MDesk 기기 등록")
+        verbose_name_plural = _("MDesk 기기 등록 목록")
+        ordering = ['-updated_at']
+        # remote_id + custom_id 조합으로 중복 방지
+        unique_together = ('remote_id', 'custom_id')
+
+    def __str__(self):
+        return f"{self.remote_id} ({self.custom_id}/{self.agent_id}) - {self.hostname}"
+
+
+class CertNoVerification(models.Model):
+    """인증번호 검증 기록"""
+    customer_id = models.CharField(verbose_name=_('고객 ID'), max_length=50)
+    mdesk_id = models.CharField(verbose_name=_('MDesk ID'), max_length=60)
+    cert_code = models.CharField(verbose_name=_('인증번호'), max_length=20)
+    hostname = models.CharField(verbose_name=_('호스트명'), max_length=100, blank=True, default='')
+    uuid = models.CharField(verbose_name='UUID', max_length=200, blank=True, default='')
+    version = models.CharField(verbose_name=_('버전'), max_length=50, blank=True, default='')
+    client_ip = models.CharField(verbose_name=_('클라이언트 IP'), max_length=50, blank=True, default='')
+    is_verified = models.BooleanField(verbose_name=_('인증 성공 여부'), default=False)
+    verified_at = models.DateTimeField(verbose_name=_('인증 시간'), auto_now_add=True)
+    
+    class Meta:
+        verbose_name = _("인증번호 검증")
+        verbose_name_plural = _("인증번호 검증 목록")
+        ordering = ['-verified_at']
+
+    def __str__(self):
+        status = "성공" if self.is_verified else "실패"
+        return f"{self.customer_id}/{self.mdesk_id} - {self.cert_code} ({status})"
 

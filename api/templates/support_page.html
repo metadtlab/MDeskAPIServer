@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% if config and config.app_name %}{{ config.app_name }}{% else %}{{ target_user.first_name|default:target_user.username }}{% endif %} 원격 지원 센터 - MDesk</title>
+    <link rel="shortcut icon" href="https://787.kr/favicon.ico">
+    <link rel="icon" type="image/x-icon" href="https://787.kr/favicon.ico">
     <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-neo.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/layui/css/layui.css">
     <style>
@@ -93,10 +95,11 @@
         }
 
         .main-content {
-            padding: 80px 50px;
+            padding: 50px 50px 80px;
             min-height: 300px;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
+            justify-content: flex-start;
             align-items: center;
         }
 
@@ -160,6 +163,48 @@
             padding: 50px;
         }
 
+        /* 상단 다운로드 버튼 */
+        .top-download-section {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 1px dashed #e0e0e0;
+        }
+
+        .top-download-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #1a44d1 100%);
+            color: white;
+            padding: 16px 32px;
+            border-radius: 16px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            box-shadow: 0 8px 25px rgba(43, 88, 240, 0.35);
+            transition: all 0.3s ease;
+        }
+
+        .top-download-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(43, 88, 240, 0.45);
+        }
+
+        .top-download-btn i {
+            font-size: 24px;
+        }
+
+        .top-download-desc {
+            color: #888;
+            font-size: 14px;
+            margin-top: 12px;
+        }
+
         .footer {
             background-color: #fcfcfc;
             padding: 30px 50px;
@@ -205,9 +250,135 @@
             .main-content { padding: 50px 30px; }
             .footer { padding: 30px; flex-direction: column; gap: 20px; text-align: center; }
         }
+
+        /* 다운로드 안내 화살표 */
+        .download-guide {
+            position: fixed;
+            top: 20px;
+            right: 80px;
+            z-index: 99999;
+            display: none;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .download-guide.show {
+            display: flex;
+        }
+
+        .guide-message {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: 700;
+            box-shadow: 0 8px 25px rgba(238, 90, 90, 0.4);
+            white-space: nowrap;
+            position: relative;
+        }
+
+        .guide-message::after {
+            content: '';
+            position: absolute;
+            right: 30px;
+            top: -12px;
+            width: 0;
+            height: 0;
+            border-left: 12px solid transparent;
+            border-right: 12px solid transparent;
+            border-bottom: 12px solid #ff6b6b;
+        }
+
+        .guide-arrow {
+            width: 60px;
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            animation: bounceArrow 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+
+        .guide-arrow svg {
+            width: 50px;
+            height: 70px;
+            filter: drop-shadow(0 4px 8px rgba(238, 90, 90, 0.5));
+        }
+
+        @keyframes bounceArrow {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-15px);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .guide-close {
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            width: 24px;
+            height: 24px;
+            background: #fff;
+            border: 2px solid #ee5a5a;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            font-weight: bold;
+            color: #ee5a5a;
+            transition: all 0.2s;
+        }
+
+        .guide-close:hover {
+            background: #ee5a5a;
+            color: #fff;
+        }
+
+        /* 안내 화살표 반응형 */
+        @media (max-width: 600px) {
+            .download-guide {
+                right: 20px;
+            }
+            .guide-message {
+                font-size: 14px;
+                padding: 12px 18px;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- 다운로드 안내 화살표 -->
+    <div class="download-guide" id="downloadGuide">
+        <div class="guide-arrow">
+            <svg viewBox="0 0 50 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="25" cy="7" r="5" fill="#ee5a5a"/>
+                <path d="M25 15 L25 70 M10 30 L25 15 L40 30" stroke="#ee5a5a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="guide-message">
+            <span class="guide-close" onclick="hideDownloadGuide()">✕</span>
+            👆 다운받은 프로그램을 실행해주세요!
+        </div>
+    </div>
+
     <div class="container">
         <div class="header">
             <div class="header-title">
@@ -226,6 +397,15 @@
                 <input type="hidden" name="action" value="download">
                 <input type="hidden" name="target_username" value="{{ target_user.username }}">
             </form>
+
+            <!-- 상단 다운로드 버튼 -->
+            <div class="top-download-section">
+                <a href="javascript:void(0);" onclick="downloadAgent('0');" class="top-download-btn">
+                    <i class="layui-icon layui-icon-download-circle"></i>
+                    원격지원 프로그램 다운로드
+                </a>
+                <p class="top-download-desc">다운받아 실행해주세요! 상담원과 빠른연결이 가능합니다</p>
+            </div>
 
             <div class="agent-grid">
                 {% for agent in agents %}
@@ -257,6 +437,65 @@
 
     <script src="/static/layui/layui.js"></script>
     <script>
+        // 현재 화면에 표시된 상담원 번호 목록
+        var currentAgents = [{% for agent in agents %}'{{ agent.agent_num }}',{% endfor %}];
+        
+        // 다운로드 안내 타이머
+        var guideTimer = null;
+        
+        // 다운로드 안내 표시
+        function showDownloadGuide() {
+            var guide = document.getElementById('downloadGuide');
+            guide.classList.add('show');
+            
+            // 이전 타이머가 있으면 취소
+            if (guideTimer) {
+                clearTimeout(guideTimer);
+            }
+            
+            // 15초 후 자동으로 숨김
+            guideTimer = setTimeout(function() {
+                hideDownloadGuide();
+            }, 15000);
+        }
+        
+        // 다운로드 안내 숨김
+        function hideDownloadGuide() {
+            var guide = document.getElementById('downloadGuide');
+            guide.classList.remove('show');
+            if (guideTimer) {
+                clearTimeout(guideTimer);
+                guideTimer = null;
+            }
+        }
+        
+        // 상담원 상태 체크 및 자동 리프레시
+        function checkAgents() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/{{ target_user.username }}/public_agents', true);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try {
+                        var resp = JSON.parse(xhr.responseText);
+                        if (resp.code === 1) {
+                            var newAgents = resp.agent_list.map(String);
+                            // 상담원 목록이 변경되었는지 확인 (순서 무관하게 비교하려면 정렬 필요하지만, 여기서는 단순 비교)
+                            if (JSON.stringify(currentAgents.sort()) !== JSON.stringify(newAgents.sort())) {
+                                console.log('상담원 목록 변경 감지, 페이지를 새로고침합니다.');
+                                location.reload();
+                            }
+                        }
+                    } catch (e) {
+                        console.error('상담원 상태 체크 오류:', e);
+                    }
+                }
+            };
+            xhr.send();
+        }
+        
+        // 3초마다 상담원 상태 체크
+        var checkInterval = setInterval(checkAgents, 3000);
+
         function downloadAgent(agentNum) {
             var layer = layui.layer;
             var loadIndex = layer.load(2);
@@ -284,6 +523,11 @@
                     a.click();
                     window.URL.revokeObjectURL(url);
                     document.body.removeChild(a);
+                    
+                    // 다운로드 시작 후 안내 화살표 표시
+                    setTimeout(function() {
+                        showDownloadGuide();
+                    }, 500);
                 } else {
                     layer.msg('다운로드 중 오류가 발생했습니다.', {icon: 2});
                 }

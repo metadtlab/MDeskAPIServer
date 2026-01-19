@@ -227,3 +227,40 @@ KAKAO_ALIMTALK_SEND_NUM = os.environ.get("KAKAO_ALIMTALK_SEND_NUM", "")
 # 템플릿 코드는 각 기능별로 하드코딩 (MDTL03: 인증번호, MDTL04: 비밀번호 변경 알림 등)
 # ==========카카오 알림톡 설정 끝=====================
 
+# ==========로깅 설정 (heartbeat 등 빈번한 요청 로그 필터링)=====================
+class SkipHeartbeatFilter:
+    """heartbeat 요청 로그를 필터링"""
+    def filter(self, record):
+        message = record.getMessage()
+        # heartbeat, currentUser 등 빈번한 요청은 로그에서 제외
+        skip_paths = ['/api/heartbeat', '/api/currentUser', '/api/sysinfo']
+        return not any(path in message for path in skip_paths)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'skip_heartbeat': {
+            '()': 'django.utils.log.CallbackFilter',
+            'callback': lambda record: not any(
+                path in record.getMessage() 
+                for path in ['/api/heartbeat', '/api/currentUser', '/api/sysinfo']
+            ),
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'filters': ['skip_heartbeat'],
+        },
+    },
+    'loggers': {
+        'django.server': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'filters': ['skip_heartbeat'],
+        },
+    },
+}
+# ==========로깅 설정 끝=====================
+

@@ -1,5 +1,7 @@
 django
 xlwt
+xlrd
+openpyxl
 mysqlclient
 psycopg2-binary
 Pillow

@@ -21,22 +21,22 @@
             
             <div class="layui-form-item">
               <label class="layui-form-label">회사명</label>
-              <div class="layui-input-inline" style="width: 200px;">
+              <div class="layui-input-block">
                 <input type="text" id="company_name" name="company_name" value="{{u.company_name}}" placeholder="회사명을 입력하세요" autocomplete="off" class="layui-input">
-              </div>
               {% if user_group %}
-              <div class="layui-input-inline">
-                <div class="layui-form-mid" style="padding: 9px 15px; background-color: #e6f7ff; border: 1px solid #91d5ff; border-radius: 4px;">
-                  <i class="layui-icon layui-icon-group" style="color: #1890ff; font-size: 14px;"></i>
+                <div class="layui-form-mid" style="padding: 0; margin-top: 5px;">
+                  <span style="display: inline-flex; align-items: center; padding: 6px 12px; background-color: #e6f7ff; border: 1px solid #91d5ff; border-radius: 4px;">
+                    <i class="layui-icon layui-icon-group" style="color: #1890ff; font-size: 14px; margin-right: 5px;"></i>
                   <span style="color: #1890ff; font-weight: bold;">{{user_group.company_name}}</span>
                   {% if user_group.contact_name %}
-                  <span style="color: #666; margin-left: 5px;">(담당: {{user_group.contact_name}})</span>
+                    <span style="color: #666; margin-left: 8px;">(담당: {{user_group.contact_name}})</span>
                   {% endif %}
-                </div>
+                  </span>
               </div>
               {% else %}
               <div class="layui-form-mid layui-word-aux">그룹 미지정</div>
               {% endif %}
+              </div>
             </div>
             
             <div class="layui-form-item">
@@ -104,7 +104,7 @@
           <hr style="margin: 30px 0; border-top: 1px dashed #e2e2e2;">
           <div class="layui-card-header" style="padding-left: 0;">
             <i class="layui-icon layui-icon-group"></i> 팀원 관리
-            <span style="color: #999; font-size: 12px; margin-left: 10px;">함께 사용할 직원들의 정보를 관리합니다.</span>
+            <span style="color: #999; font-size: 12px; margin-left: 10px;">아이디를 함께 사용할 직원들의 정보를 관리합니다.(로그인을 직원별로 하시려면 사용자 관리를 이용하세요.)</span>
           </div>
           
           <!-- 팀원 추가 폼 -->
@@ -117,7 +117,7 @@
                 </div>
               </div>
               <div class="layui-inline">
-                <label class="layui-form-label" style="width: 80px;">전화번호</label>
+                <label class="layui-form-label" style="width: 90px;">전화번호</label>
                 <div class="layui-input-inline" style="width: 150px;">
                   <input type="tel" id="member_phone" name="member_phone" placeholder="전화번호" autocomplete="off" class="layui-input">
                 </div>
