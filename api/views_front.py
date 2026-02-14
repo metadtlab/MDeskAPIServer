@@ -29,6 +29,7 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 import random
+import uuid
 import zipfile
 import os
 from django.core.files.storage import default_storage
@@ -201,7 +202,7 @@ def user_action(request):
     action = request.GET.get('action', '')
     
     # 로그인 관련 액션은 admin.787.kr로만 접근 가능
-    if action in ['login', 'register', 'logout', 'edit_profile']:
+    if action in ['login', 'login_2fa', 'register', 'logout', 'edit_profile']:
         host = request.get_host()
         admin_host = getattr(settings, 'ID_SERVER', 'admin.787.kr')
         if not (host.startswith(admin_host) or host.startswith('admin.localhost')):
@@ -209,6 +210,8 @@ def user_action(request):
     
     if action == 'login':
         return user_login(request)
+    elif action == 'login_2fa':
+        return user_login_2fa_verify(request)
     elif action == 'register':
         return user_register(request)
     elif action == 'logout':
@@ -229,6 +232,43 @@ def user_action(request):
         return
 
 
+def _send_web_2fa_email(email, code, username):
+    """웹 로그인 2FA 인증코드 이메일 발송"""
+    try:
+        subject = _('MDesk 로그인 2차 인증코드')
+        message = f"""안녕하세요, {username}님.
+
+MDesk 로그인 2차 인증코드입니다.
+
+인증코드: {code}
+
+이 인증코드는 5분간 유효합니다.
+본인이 로그인을 시도하지 않았다면, 비밀번호를 즉시 변경해주세요.
+
+감사합니다.
+MDesk 원격지원"""
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=False)
+        return True
+    except Exception as e:
+        print(f"[2FA 이메일] 웹 로그인 발송 실패: {str(e)}")
+        return False
+
+
+def _send_web_2fa_sms(phone, code, username):
+    """웹 로그인 2FA 인증코드 카카오 알림톡 발송"""
+    try:
+        send_kakao_alimtalk(phone, code)
+        return True
+    except Exception as e:
+        print(f"[2FA 알림톡] 웹 로그인 발송 실패: {str(e)}")
+        return False
+
+
+def _generate_2fa_code():
+    """6자리 2FA 인증코드 생성"""
+    return str(random.randint(100000, 999999))
+
+
 def user_login(request):
     if request.method == 'GET':
         return render(request, 'login.html')
@@ -239,16 +279,79 @@ def user_login(request):
         return JsonResponse({'code': 0, 'msg': _('문제가 발생했습니다. 사용자명 또는 비밀번호를 가져올 수 없습니다.')})
 
     user = auth.authenticate(username=username, password=password)
-    if user:
-        auth.login(request, user)
-        return JsonResponse({
-            'code': 1, 
-            'url': '/api/work',
-            'user_pkid': user.id,
-            'username': user.username
-        })
-    else:
+    if not user:
         return JsonResponse({'code': 0, 'msg': _('계정 또는 비밀번호가 틀렸습니다!')})
+
+    # 2차 인증(2FA) 확인
+    email_2fa = getattr(user, 'email_2fa', False)
+    phone_2fa = getattr(user, 'phone_2fa', False)
+    tfa_required = email_2fa or phone_2fa
+
+    if tfa_required:
+        code = _generate_2fa_code()
+        tfa_key = f'2fa_web_{uuid.uuid4().hex}'
+        cache.set(tfa_key, {
+            'code': code,
+            'user_id': user.id,
+            'attempts': 0,
+        }, timeout=300)  # 5분
+
+        sent_methods = []
+        if email_2fa and user.email and _send_web_2fa_email(user.email, code, user.username):
+            email_parts = user.email.split('@')
+            sent_methods.append({'type': 'email', 'target': email_parts[0][:2] + '***@' + email_parts[1]})
+        if phone_2fa and user.phone and _send_web_2fa_sms(user.phone, code, user.username):
+            phone_clean = user.phone.replace('-', '')
+            sent_methods.append({'type': 'phone', 'target': phone_clean[:3] + '****' + phone_clean[-4:]})
+
+        if not sent_methods:
+            cache.delete(tfa_key)
+            auth.login(request, user)
+            return JsonResponse({'code': 1, 'url': '/api/work', 'user_pkid': user.id, 'username': user.username})
+
+        return JsonResponse({
+            'code': 0,
+            'tfa_required': True,
+            'tfa_key': tfa_key,
+            'tfa_methods': sent_methods,
+            'msg': _('2차 인증이 필요합니다. 발송된 인증코드를 입력해주세요.')
+        })
+
+    auth.login(request, user)
+    return JsonResponse({'code': 1, 'url': '/api/work', 'user_pkid': user.id, 'username': user.username})
+
+
+def user_login_2fa_verify(request):
+    """웹 로그인 2차 인증코드 검증"""
+    if request.method != 'POST':
+        return JsonResponse({'code': 0, 'msg': _('잘못된 요청입니다.')})
+
+    tfa_key = request.POST.get('tfa_key', '')
+    tfa_code = request.POST.get('tfa_code', '')
+    if not tfa_key or not tfa_code:
+        return JsonResponse({'code': 0, 'msg': _('인증코드를 입력해주세요.')})
+
+    tfa_data = cache.get(tfa_key)
+    if not tfa_data:
+        return JsonResponse({'code': 0, 'msg': _('인증코드가 만료되었습니다. 다시 로그인해주세요.')})
+
+    if tfa_data.get('attempts', 0) >= 5:
+        cache.delete(tfa_key)
+        return JsonResponse({'code': 0, 'msg': _('인증 시도 횟수를 초과했습니다. 다시 로그인해주세요.')})
+
+    if tfa_code.strip() != tfa_data['code']:
+        tfa_data['attempts'] = tfa_data.get('attempts', 0) + 1
+        cache.set(tfa_key, tfa_data, timeout=300)
+        remaining = 5 - tfa_data['attempts']
+        return JsonResponse({'code': 0, 'msg': _('인증코드가 일치하지 않습니다. (남은 시도: {}회)').format(remaining)})
+
+    cache.delete(tfa_key)
+    user = UserProfile.objects.filter(id=tfa_data['user_id']).first()
+    if not user:
+        return JsonResponse({'code': 0, 'msg': _('사용자를 찾을 수 없습니다.')})
+
+    auth.login(request, user)
+    return JsonResponse({'code': 1, 'url': '/api/work', 'user_pkid': user.id, 'username': user.username})
 
 
 def user_register(request):
@@ -1030,6 +1133,16 @@ def edit_profile(request):
                 except Exception as e:
                     print(f"알림톡 발송 실패: {member.name} - {str(e)}")
     
+    # 2차 인증(2FA) 설정 저장 - 둘 중 하나만 선택 가능
+    email_2fa = request.POST.get('email_2fa', '0') == '1' and bool(u.email)
+    phone_2fa = request.POST.get('phone_2fa', '0') == '1' and bool(u.phone)
+    if email_2fa and phone_2fa:
+        email_2fa = False  # 상호 배타: 휴대전화 우선
+    
+    u.email_2fa = email_2fa
+    u.phone_2fa = phone_2fa
+    u.save()
+    
     result['code'] = 1
     result['msg'] = _('정보가 성공적으로 수정되었습니다.')
     result['notified_count'] = notified_count
@@ -1105,6 +1218,54 @@ def user_logout(request):
     return HttpResponseRedirect('/api/user_action?action=login')
 
 
+def get_recent_remotes_for_user(uid, limit=10):
+    """사용자가 최근 접속한 원격지 목록 (ConnLog 기준)"""
+    user_peers = RustDeskPeer.objects.filter(Q(uid=uid))
+    user_rids = [str(p.rid) for p in user_peers]
+    if not user_rids:
+        return []
+    # 사용자가 from_id(내 기기)로 접속한 경우: from_id IN user_rids, rid=원격지
+    logs = list(ConnLog.objects.filter(
+        from_id__in=user_rids,
+        conn_start__isnull=False
+    ).order_by('-conn_start')[:limit * 5])
+    seen = set()
+    result = []
+    rids_from_logs = list(set(x.rid for x in logs if x.rid))
+    peer_map = {p.rid: p for p in RustDeskPeer.objects.filter(rid__in=rids_from_logs)}
+    device_map = {d.rid: d for d in RustDesDevice.objects.filter(rid__in=rids_from_logs)}
+    for log in logs:
+        if log.rid in seen or len(result) >= limit:
+            continue
+        seen.add(log.rid)
+        peer = peer_map.get(log.rid)
+        device = device_map.get(log.rid)
+        alias = peer.alias if peer else (device.hostname if device else log.rid)
+        hostname = device.hostname if device else '-'
+        result.append({
+            'rid': log.rid,
+            'alias': alias or log.rid,
+            'hostname': hostname,
+            'last_conn': log.conn_start,
+        })
+    return result
+
+
+def get_connection_stats_for_user(uid):
+    """사용자 연결 통계 (오늘, 이번 주, 전체)"""
+    user_peers = RustDeskPeer.objects.filter(Q(uid=uid))
+    user_rids = [str(p.rid) for p in user_peers]
+    if not user_rids:
+        return {'today': 0, 'week': 0, 'total': 0}
+    now = datetime.datetime.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = today_start - datetime.timedelta(days=now.weekday())
+    today_count = ConnLog.objects.filter(from_id__in=user_rids, conn_start__gte=today_start).count()
+    week_count = ConnLog.objects.filter(from_id__in=user_rids, conn_start__gte=week_start).count()
+    total_count = ConnLog.objects.filter(from_id__in=user_rids).count()
+    return {'today': today_count, 'week': week_count, 'total': total_count}
+
+
 def get_single_info(uid):
     peers = RustDeskPeer.objects.filter(Q(uid=uid))
     rids = [x.rid for x in peers]
@@ -1167,7 +1328,16 @@ def work(request):
     paginator = Paginator(get_all_info(), 15) if show_type == 'admin' and u.is_admin else Paginator(get_single_info(u.id), 15)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    return render(request, 'show_work.html', {'u': u, 'show_all': show_all, 'page_obj': page_obj})
+
+    # 최근 접속 원격지 및 연결 통계 (일반 사용자 뷰에서만)
+    recent_remotes = get_recent_remotes_for_user(u.id) if not show_all else []
+    connection_stats = get_connection_stats_for_user(u.id) if not show_all else {'today': 0, 'week': 0, 'total': 0}
+
+    return render(request, 'show_work.html', {
+        'u': u, 'show_all': show_all, 'page_obj': page_obj,
+        'recent_remotes': recent_remotes,
+        'connection_stats': connection_stats
+    })
 
 
 @login_required(login_url='/api/user_action?action=login')
@@ -1909,6 +2079,10 @@ def user_manage_save(request):
     is_admin = request.POST.get('is_admin', '0') == '1'
     is_group_admin = request.POST.get('is_group_admin', '0') == '1'
     new_password = request.POST.get('new_password', '')
+    email_2fa = request.POST.get('email_2fa', '0') == '1' and bool(email)
+    phone_2fa = request.POST.get('phone_2fa', '0') == '1' and bool(phone)
+    if email_2fa and phone_2fa:
+        email_2fa = False
     
     try:
         max_agents = int(max_agents)
@@ -1946,6 +2120,8 @@ def user_manage_save(request):
             target_user.group_id = group_id
             target_user.email = email
             target_user.phone = phone
+            target_user.email_2fa = email_2fa
+            target_user.phone_2fa = phone_2fa
             # 그룹관리자는 회원등급 변경 불가 (기존 값 유지)
             if not (u.is_group_admin and not u.is_superuser):
                 target_user.membership_level = membership_level
@@ -2037,6 +2213,8 @@ def user_manage_save(request):
                 group_id=group_id,
                 email=email,
                 phone=phone,
+                email_2fa=email_2fa,
+                phone_2fa=phone_2fa,
                 membership_level=final_membership_level,
                 max_agents=final_max_agents,
                 relay_server=relay_server,

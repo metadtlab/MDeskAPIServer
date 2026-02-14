@@ -85,6 +85,25 @@
               </div>
             </div>
             
+            <div class="layui-form-item">
+              <label class="layui-form-label">로그인 2차인증</label>
+              <div class="layui-input-block">
+                <div style="display: flex; align-items: center; padding-top: 8px;">
+                  <input type="checkbox" id="email_2fa" name="email_2fa" lay-skin="primary" lay-filter="tfa_method" title="이메일인증" {% if u.email_2fa %}checked{% endif %} {% if not u.email %}disabled{% endif %}>
+                  <input type="checkbox" id="phone_2fa" name="phone_2fa" lay-skin="primary" lay-filter="tfa_method" title="휴대전화인증" {% if u.phone_2fa %}checked{% endif %} {% if not u.phone %}disabled{% endif %}>
+                </div>
+                <div class="layui-form-mid layui-word-aux">
+                  MDesk 클라이언트 로그인 시 2차 인증을 사용합니다. 둘 중 하나만 선택할 수 있습니다. 
+                  {% if not u.email and not u.phone %}
+                  <span style="color: #FF5722;">(이메일 또는 휴대전화를 먼저 등록해주세요)</span>
+                  {% else %}
+                    {% if not u.email %}<span style="color: #999;">(이메일 미등록 - 이메일인증 사용 불가)</span>{% endif %}
+                    {% if not u.phone %}<span style="color: #999;">(휴대전화 미등록 - 휴대전화인증 사용 불가)</span>{% endif %}
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            
             <div class="layui-form-item" id="password_confirm_div" style="display: none;">
               <label class="layui-form-label">비밀번호 확인</label>
               <div class="layui-input-block">
@@ -190,6 +209,21 @@
                 /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
                 '올바른 이메일 형식을 입력해주세요.'
             ]
+        });
+        
+        // 체크박스 렌더링
+        form.render('checkbox');
+        
+        // 2FA 방식 상호 배타: 둘 중 하나만 선택 가능
+        form.on('checkbox(tfa_method)', function(data) {
+            if (data.elem.checked) {
+                var otherId = data.elem.id === 'email_2fa' ? 'phone_2fa' : 'email_2fa';
+                var other = document.getElementById(otherId);
+                if (other && !other.disabled) {
+                    other.checked = false;
+                    form.render('checkbox');
+                }
+            }
         });
         
         var phoneVerified = {{ u.phone_verified|yesno:"true,false" }};
@@ -335,6 +369,8 @@
         // 프로필 저장 함수
         function saveProfile(notifyTeam) {
             var newPassword = $('#new_password').val();
+            var email2fa = $('input[name="email_2fa"]').is(':checked') ? '1' : '0';
+            var phone2fa = $('input[name="phone_2fa"]').is(':checked') ? '1' : '0';
             
             $.ajax({
                 url:'/api/user_action?action=edit_profile',
@@ -346,7 +382,9 @@
                     phone: $('#phone').val(),
                     phone_verified: phoneVerified ? '1' : '0',
                     new_password: newPassword,
-                    notify_team: notifyTeam ? '1' : '0'
+                    notify_team: notifyTeam ? '1' : '0',
+                    email_2fa: email2fa,
+                    phone_2fa: phone2fa
                 },
                 success:function(resp){
                     if (resp.code == 1) {

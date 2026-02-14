@@ -7,6 +7,7 @@ else:
 from api import views
  
 urlpatterns = [
+    url(r'^login/2fa$',views.login_2fa_verify),  # 2차 인증코드 검증 API
     url(r'^login',views.login),
     url(r'^logout',views.logout),
     url(r'^ab$',views.ab),
@@ -68,11 +69,13 @@ urlpatterns = [
     url(r'^relay_server/delete/(?P<id>\d+)$', views.relay_server_delete), # 릴레이 서버 삭제 API
     url(r'^verify_remote_user$', views.verify_remote_user), # 원격 사용자 인증 API
     url(r'^certno/generate$', views.certno_generate), # 인증번호 발급 API
+    url(r'^certno/cancel$', views.certno_cancel), # 인증번호 취소 API (원격지 요청)
     url(r'^certno/delete$', views.certno_delete), # 인증번호 삭제 API
     url(r'^certno/search$', views.certno_search), # 인증번호 조회 API
     url(r'^certno/verify$', views.certno_verify), # 인증번호 검증 API
     url(r'^download/(?P<customer_id>[\w.@+-]+)$', views.download_client), # 클라이언트 다운로드 API
     url(r'^device/register$', views.device_register), # MDesk 기기 등록 API
+    url(r'^device/unregister$', views.device_unregister), # MDesk 기기 등록 해제 API
     url(r'^device/list$', views.device_list_query), # MDesk 기기 목록 조회 API (쿼리 파라미터)
     url(r'^device/list/(?P<custom_id>[\w.@+-]+)$', views.device_list), # MDesk 기기 목록 조회 API (경로 파라미터)
     ]

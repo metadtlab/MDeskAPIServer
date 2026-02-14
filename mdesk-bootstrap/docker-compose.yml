@@ -1,0 +1,57 @@
+version: "3.8"
+
+services:
+  backend:
+    container_name: mdesk-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    expose:
+      - "8080"
+    restart: unless-stopped
+    depends_on:
+      - postgres
+
+  frontend:
+    container_name: mdesk-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8080
+    expose:
+      - "3000"
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mdesk-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DBNAME}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: mdesk-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

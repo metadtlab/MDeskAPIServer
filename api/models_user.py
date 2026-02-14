@@ -64,6 +64,10 @@ class UserProfile(AbstractBaseUser, PermissionsMixin):
     max_agents = models.IntegerField(verbose_name=_('최대 상담원 수'), default=3)
     relay_server = models.CharField(verbose_name=_('릴레이 서버'), max_length=100, blank=True, default='222.239.231.91')
     
+    # 2차 인증 (2FA) 설정
+    email_2fa = models.BooleanField(verbose_name=_('이메일 2차인증'), default=False)
+    phone_2fa = models.BooleanField(verbose_name=_('휴대전화 2차인증'), default=False)
+    
     is_active = models.BooleanField(verbose_name=_('활성화 여부'), default=True)
     is_admin = models.BooleanField(verbose_name=_('관리자 여부'), default=False)
     is_group_admin = models.BooleanField(verbose_name=_('그룹 관리자 여부'), default=False)

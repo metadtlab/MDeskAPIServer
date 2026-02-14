@@ -294,6 +294,23 @@
                 <a href="javascript:;" class="find-password">비밀번호 찾기</a>
             </div>
     </form>
+
+        <!-- 2차 인증 모달 (2FA) -->
+        <div id="tfaModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 16px; padding: 40px; max-width: 400px; width: 90%; box-shadow: 0 25px 50px rgba(0,0,0,0.25);">
+                <h3 style="margin-bottom: 10px; color: #1a1a2e;">2차 인증</h3>
+                <p style="color: #666; font-size: 14px; margin-bottom: 24px;" id="tfaMsg">등록된 이메일 또는 휴대전화로 발송된 6자리 인증코드를 입력하세요.</p>
+                <input type="hidden" id="tfaKey" value="">
+                <div class="input-group" style="margin-bottom: 20px;">
+                    <label>인증코드</label>
+                    <input type="text" id="tfaCode" class="layui-input" placeholder="6자리 숫자" maxlength="6" autocomplete="off" style="letter-spacing: 4px; font-size: 18px;">
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" id="tfaSubmit" class="layui-btn" style="flex: 1; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);">확인</button>
+                    <button type="button" id="tfaCancel" class="layui-btn layui-btn-primary" style="flex: 1; height: 48px; border-radius: 12px;">취소</button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
  
@@ -317,13 +334,50 @@
                 type: 'post',
                 success: function(resp) {
                     if(resp.code == 1) {
-                            location.href = resp.url;
-		    			} else {
+                        location.href = resp.url;
+                    } else if(resp.tfa_required) {
+                        $('#tfaKey').val(resp.tfa_key);
+                        var methods = (resp.tfa_methods || []).map(function(m){ return m.target; }).join(', ');
+                        $('#tfaMsg').text('등록된 ' + (methods || '연락처') + '로 발송된 6자리 인증코드를 입력하세요.');
+                        $('#tfaCode').val('').focus();
+                        $('#tfaModal').css('display', 'flex');
+                    } else {
                         layer.alert(resp.msg, {icon: 5, title: '알림', btn: ['확인']});
-		    			}
+                    }
                 }
             });
             return false;
+        });
+
+        $('#tfaSubmit').on('click', function() {
+            var tfaKey = $('#tfaKey').val();
+            var tfaCode = $('#tfaCode').val();
+            if(!tfaCode || tfaCode.length !== 6) {
+                layer.msg('6자리 인증코드를 입력하세요.');
+                return;
+            }
+            $.ajax({
+                url: '/api/user_action?action=login_2fa',
+                data: { tfa_key: tfaKey, tfa_code: tfaCode },
+                dataType: 'json',
+                type: 'post',
+                success: function(resp) {
+                    if(resp.code == 1) {
+                        location.href = resp.url;
+                    } else {
+                        layer.msg(resp.msg);
+                    }
+                }
+            });
+        });
+
+        $('#tfaCancel').on('click', function() {
+            $('#tfaModal').css('display', 'none');
+            $('#tfaCode').val('');
+        });
+
+        $('#tfaCode').on('keypress', function(e) {
+            if(e.which === 13) $('#tfaSubmit').click();
         });
         
         $('.find-password').on('click', function(){

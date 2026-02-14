@@ -87,6 +87,17 @@
             </div>
             
             <div class="layui-form-item">
+              <label class="layui-form-label">로그인 2차인증</label>
+              <div class="layui-input-block">
+                <div style="display: flex; align-items: center; padding-top: 8px;">
+                  <input type="checkbox" id="email_2fa" name="email_2fa" lay-skin="primary" lay-filter="tfa_method" title="이메일인증" {% if edit_user and edit_user.email_2fa %}checked{% endif %}>
+                  <input type="checkbox" id="phone_2fa" name="phone_2fa" lay-skin="primary" lay-filter="tfa_method" title="휴대전화인증" {% if edit_user and edit_user.phone_2fa %}checked{% endif %}>
+                </div>
+                <div class="layui-form-mid layui-word-aux">MDesk 로그인 시 2차 인증 사용. 둘 중 하나만 선택. (이메일/휴대전화 등록 시 활성화)</div>
+              </div>
+            </div>
+            
+            <div class="layui-form-item">
               <label class="layui-form-label">회원등급</label>
               <div class="layui-input-block">
                 <select id="membership_level" name="membership_level" {% if u.is_group_admin and not u.is_superuser %}disabled style="background-color: #f2f2f2; cursor: not-allowed;"{% endif %}>
@@ -879,6 +890,18 @@
         // 폼 렌더링 (select 등)
         form.render();
         
+        // 2FA 방식 상호 배타: 둘 중 하나만 선택 가능
+        form.on('checkbox(tfa_method)', function(data) {
+            if (data.elem.checked) {
+                var otherId = data.elem.id === 'email_2fa' ? 'phone_2fa' : 'email_2fa';
+                var other = document.getElementById(otherId);
+                if (other) {
+                    other.checked = false;
+                    form.render('checkbox');
+                }
+            }
+        });
+        
         // 전체 선택 체크박스
         form.on('checkbox(checkAll)', function(data) {
             var isChecked = data.elem.checked;
@@ -971,6 +994,8 @@
                     group_id: $('#group_id').val(),
                     email: $('#email').val(),
                     phone: $('#phone').val(),
+                    email_2fa: $('#email_2fa').is(':checked') ? '1' : '0',
+                    phone_2fa: $('#phone_2fa').is(':checked') ? '1' : '0',
                     membership_level: $('#membership_level').val(),
                     max_agents: $('#max_agents').val(),
                     relay_server: $('#relay_server').val(),

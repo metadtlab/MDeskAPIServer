@@ -25,6 +25,116 @@ def get_client_ip(request):
     return ip
 
 
+def _generate_2fa_code():
+    """6자리 2FA 인증코드 생성"""
+    import random
+    return str(random.randint(100000, 999999))
+
+
+def _send_2fa_email(email, code, username):
+    """2FA 인증코드 이메일 발송"""
+    from django.core.mail import send_mail
+    from django.conf import settings
+    try:
+        subject = 'MDesk 로그인 2차 인증코드'
+        message = f"""안녕하세요, {username}님.
+
+MDesk 로그인 2차 인증코드입니다.
+
+인증코드: {code}
+
+이 인증코드는 5분간 유효합니다.
+본인이 로그인을 시도하지 않았다면, 비밀번호를 즉시 변경해주세요.
+
+감사합니다.
+MDesk 원격지원"""
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [email],
+            fail_silently=False,
+        )
+        print(f"[2FA 이메일] 발송 성공: {username} ({email})")
+        return True
+    except Exception as e:
+        print(f"[2FA 이메일] 발송 실패: {str(e)}")
+        return False
+
+
+def _send_2fa_sms(phone, code, username):
+    """2FA 인증코드 카카오 알림톡 발송"""
+    try:
+        send_kakao_alimtalk(phone, code)
+        print(f"[2FA 알림톡] 발송 성공: {username} ({phone})")
+        return True
+    except Exception as e:
+        print(f"[2FA 알림톡] 발송 실패: {str(e)}")
+        return False
+
+
+def _complete_login(user, rid, uuid):
+    """로그인 완료 처리: 디바이스 바인딩 + 토큰 발급 + 응답 생성"""
+    # 디바이스 바인딩
+    peer = RustDeskPeer.objects.filter(Q(rid=rid)).first()
+    if not peer:
+        device = RustDesDevice.objects.filter(Q(uuid=uuid)).first()
+        if device:
+            peer = RustDeskPeer()
+            peer.uid = user.id
+            peer.rid = device.rid
+            peer.hostname = device.hostname
+            peer.username = device.username
+            peer.save()
+
+    token = RustDeskToken.objects.filter(Q(uid=user.id) & Q(username=user.username) & Q(rid=user.rid)).first()
+
+    # 토큰 만료 확인
+    if token:
+        now_t = datetime.datetime.now()
+        nums = (now_t - token.create_time).seconds if now_t > token.create_time else 0
+        if nums >= EFFECTIVE_SECONDS:
+            token.delete()
+            token = None
+
+    if not token:
+        token = RustDeskToken(
+            username=user.username,
+            uid=user.id,
+            uuid=user.uuid,
+            rid=user.rid,
+            access_token=getStrMd5(str(time.time()) + salt)
+        )
+        token.save()
+
+    # 릴레이 서버 퍼블릭 키 조회
+    relay_pub_key = ''
+    if user.relay_server:
+        rs = RelayServer.objects.filter(server_address=user.relay_server).first()
+        if rs:
+            relay_pub_key = rs.public_key
+
+    result = {
+        'access_token': token.access_token,
+        'type': 'access_token',
+        'user': {
+            'user_pkid': user.id,
+            'name': user.username,
+            'email': user.email,
+            'phone': user.phone,
+            'company_name': user.company_name,
+            'membership_level': user.membership_level,
+            'membership_start': user.membership_start.isoformat() if user.membership_start else None,
+            'membership_expires': user.membership_expires.isoformat() if user.membership_expires else None,
+            'max_agents': user.max_agents,
+            'relay_server': user.relay_server,
+            'relay_pub_key': relay_pub_key,
+            'is_admin': user.is_admin,
+        }
+    }
+    return result
+
+
 def login(request):
     result = {}
     if request.method == 'GET':
@@ -50,63 +160,100 @@ def login(request):
     user.rtype = rtype
     user.deviceInfo = json.dumps(deviceInfo)
     user.save()
-    # 绑定设备  20240819
-    peer = RustDeskPeer.objects.filter(Q(rid=rid)).first()
-    if not peer:
-        device = RustDesDevice.objects.filter(Q(uuid=uuid)).first()
-        if device:
-            peer = RustDeskPeer()
-            peer.uid = user.id
-            peer.rid = device.rid
-            # peer.abid = ab.guid    # v2,  current version not used
-            peer.hostname = device.hostname
-            peer.username = device.username
-            peer.save()
 
-    token = RustDeskToken.objects.filter(Q(uid=user.id) & Q(username=user.username) & Q(rid=user.rid)).first()
+    # ===== 2차 인증(2FA) 확인 =====
+    tfa_required = getattr(user, 'email_2fa', False) or getattr(user, 'phone_2fa', False)
+    
+    if tfa_required:
+        # 2FA 인증코드 생성 및 캐시 저장 (5분 유효)
+        code = _generate_2fa_code()
+        tfa_key = f'2fa_{user.id}_{rid}'
+        cache.set(tfa_key, {
+            'code': code,
+            'user_id': user.id,
+            'rid': rid,
+            'uuid': uuid,
+            'attempts': 0,
+        }, timeout=300)  # 5분
+        
+        # 2FA 방식에 따라 인증코드 발송
+        sent_methods = []
+        if getattr(user, 'email_2fa', False) and user.email:
+            if _send_2fa_email(user.email, code, user.username):
+                # 이메일 마스킹 (예: te***@gmail.com)
+                email_parts = user.email.split('@')
+                masked = email_parts[0][:2] + '***@' + email_parts[1]
+                sent_methods.append({'type': 'email', 'target': masked})
+        
+        if getattr(user, 'phone_2fa', False) and user.phone:
+            if _send_2fa_sms(user.phone, code, user.username):
+                # 전화번호 마스킹 (예: 010****5678)
+                phone_clean = user.phone.replace('-', '')
+                masked = phone_clean[:3] + '****' + phone_clean[-4:]
+                sent_methods.append({'type': 'phone', 'target': masked})
+        
+        if not sent_methods:
+            # 발송 실패 시 2FA 건너뛰고 로그인 완료
+            print(f"[2FA] 인증코드 발송 실패, 2FA 건너뜀: {user.username}")
+            cache.delete(tfa_key)
+        else:
+            # 2FA 필요 응답 반환
+            result['tfa_required'] = True
+            result['tfa_key'] = tfa_key
+            result['tfa_methods'] = sent_methods
+            result['tfa_message'] = _('2차 인증이 필요합니다. 발송된 인증코드를 입력해주세요.')
+            return JsonResponse(result)
+    
+    # 2FA 불필요 또는 발송 실패 시 바로 로그인 완료
+    result = _complete_login(user, rid, uuid)
+    return JsonResponse(result)
 
-    # 检查是否过期
-    if token:
-        now_t = datetime.datetime.now()
-        nums = (now_t - token.create_time).seconds if now_t > token.create_time else 0
-        if nums >= EFFECTIVE_SECONDS:
-            token.delete()
-            token = None
 
-    if not token:
-        # 获取并保存token
-        token = RustDeskToken(
-            username=user.username,
-            uid=user.id,
-            uuid=user.uuid,
-            rid=user.rid,
-            access_token=getStrMd5(str(time.time()) + salt)
-        )
-        token.save()
-
-    # 릴레이 서버 퍼블릭 키 조회
-    relay_pub_key = ''
-    if user.relay_server:
-        rs = RelayServer.objects.filter(server_address=user.relay_server).first()
-        if rs:
-            relay_pub_key = rs.public_key
-
-    result['access_token'] = token.access_token
-    result['type'] = 'access_token'
-    result['user'] = {
-        'user_pkid': user.id,
-        'name': user.username,
-        'email': user.email,
-        'phone': user.phone,
-        'company_name': user.company_name,
-        'membership_level': user.membership_level,
-        'membership_start': user.membership_start.isoformat() if user.membership_start else None,
-        'membership_expires': user.membership_expires.isoformat() if user.membership_expires else None,
-        'max_agents': user.max_agents,
-        'relay_server': user.relay_server,
-        'relay_pub_key': relay_pub_key,
-        'is_admin': user.is_admin,
-    }
+def login_2fa_verify(request):
+    """2차 인증코드 검증 API"""
+    result = {}
+    if request.method == 'GET':
+        result['error'] = _('요청 방식 오류! POST 방식을 사용하세요.')
+        return JsonResponse(result)
+    
+    data = json.loads(request.body.decode())
+    tfa_key = data.get('tfa_key', '')
+    tfa_code = data.get('tfa_code', '')
+    
+    if not tfa_key or not tfa_code:
+        result['error'] = _('인증코드와 인증 키가 필요합니다.')
+        return JsonResponse(result)
+    
+    # 캐시에서 2FA 정보 조회
+    tfa_data = cache.get(tfa_key)
+    if not tfa_data:
+        result['error'] = _('인증코드가 만료되었습니다. 다시 로그인해주세요.')
+        return JsonResponse(result)
+    
+    # 시도 횟수 확인 (최대 5회)
+    if tfa_data.get('attempts', 0) >= 5:
+        cache.delete(tfa_key)
+        result['error'] = _('인증 시도 횟수를 초과했습니다. 다시 로그인해주세요.')
+        return JsonResponse(result)
+    
+    # 인증코드 검증
+    if tfa_code != tfa_data['code']:
+        tfa_data['attempts'] = tfa_data.get('attempts', 0) + 1
+        cache.set(tfa_key, tfa_data, timeout=300)
+        remaining = 5 - tfa_data['attempts']
+        result['error'] = _('인증코드가 일치하지 않습니다. (남은 시도: {}회)').format(remaining)
+        return JsonResponse(result)
+    
+    # 인증 성공 - 캐시 삭제
+    cache.delete(tfa_key)
+    
+    # 사용자 조회 및 로그인 완료
+    user = UserProfile.objects.filter(id=tfa_data['user_id']).first()
+    if not user:
+        result['error'] = _('사용자를 찾을 수 없습니다.')
+        return JsonResponse(result)
+    
+    result = _complete_login(user, tfa_data['rid'], tfa_data['uuid'])
     return JsonResponse(result)
 
 
@@ -1737,6 +1884,106 @@ def device_register(request):
 
 
 @csrf_exempt
+def device_unregister(request):
+    """MDesk 기기 등록 해제 API
+    
+    엔드포인트: POST /api/device/unregister
+    Content-Type: application/json
+    
+    요청 데이터:
+    {
+        "user_id": "imedix",           // 사용자 ID (username)
+        "remote_id": "527085412"       // 원격 ID (peer ID)
+    }
+    
+    응답 (성공 - 200 OK):
+    {
+        "success": true,
+        "message": "Device unregistered successfully",
+        "data": {
+            "user_id": "imedix",
+            "remote_id": "527085412"
+        }
+    }
+    
+    응답 (실패 - 400/404/500):
+    {
+        "success": false,
+        "error": "ERROR_CODE",
+        "message": "에러 메시지"
+    }
+    """
+    result = {}
+    
+    if request.method != 'POST':
+        result['success'] = False
+        result['error'] = 'METHOD_NOT_ALLOWED'
+        result['message'] = _('POST 방식으로 요청하세요.')
+        return JsonResponse(result, status=405)
+    
+    # 클라이언트 정보 수집
+    client_ip = get_client_ip(request)
+    
+    try:
+        data = json.loads(request.body.decode())
+    except:
+        result['success'] = False
+        result['error'] = 'INVALID_JSON'
+        result['message'] = _('잘못된 요청 형식입니다.')
+        return JsonResponse(result, status=400)
+    
+    # 요청 데이터 추출
+    user_id = data.get('user_id', '')
+    remote_id = data.get('remote_id', '')
+    
+    # 필수 필드 확인
+    if not user_id:
+        result['success'] = False
+        result['error'] = 'MISSING_USER_ID'
+        result['message'] = _('user_id는 필수 항목입니다.')
+        return JsonResponse(result, status=400)
+    
+    if not remote_id:
+        result['success'] = False
+        result['error'] = 'MISSING_REMOTE_ID'
+        result['message'] = _('remote_id는 필수 항목입니다.')
+        return JsonResponse(result, status=400)
+    
+    try:
+        # 해당 기기 조회
+        device = MdeskDeviceRegistration.objects.filter(
+            remote_id=remote_id,
+            custom_id=user_id
+        ).first()
+        
+        if not device:
+            result['success'] = False
+            result['error'] = 'DEVICE_NOT_FOUND'
+            result['message'] = _('등록된 기기를 찾을 수 없습니다.')
+            return JsonResponse(result, status=404)
+        
+        # 기기 삭제
+        device.delete()
+        
+        result['success'] = True
+        result['message'] = _('Device unregistered successfully')
+        result['data'] = {
+            'user_id': user_id,
+            'remote_id': remote_id
+        }
+        
+        print(f"[DEVICE_UNREGISTER] 기기 삭제: {remote_id} ({user_id}) from {client_ip}")
+        return JsonResponse(result, status=200)
+        
+    except Exception as e:
+        result['success'] = False
+        result['error'] = 'INTERNAL_ERROR'
+        result['message'] = _('기기 등록 해제 중 오류가 발생했습니다: {}').format(str(e))
+        print(f"[DEVICE_UNREGISTER] 오류: {str(e)}")
+        return JsonResponse(result, status=500)
+
+
+@csrf_exempt
 def device_list(request, custom_id):
     """등록된 MDesk 기기 목록 조회 API (Bearer 토큰 인증 필요)
     
@@ -1811,9 +2058,19 @@ def device_list(request, custom_id):
         ).order_by('-updated_at')
         
         device_list = []
+        
+        # custom_id로 UserProfile 조회하여 실제 user_pkid (UserProfile.id) 가져오기
+        actual_user_pkid = ''
+        try:
+            user_profile = UserProfile.objects.get(username=custom_id)
+            actual_user_pkid = str(user_profile.id)
+        except UserProfile.DoesNotExist:
+            pass
+        
         for device in devices:
             device_list.append({
                 'remote_id': device.remote_id,
+                'user_pkid': actual_user_pkid,
                 'agent_id': device.agent_id,
                 'hostname': device.hostname,
                 'version': device.version,
@@ -1879,9 +2136,18 @@ def device_list_query(request):
             five_minutes_ago = timezone.now() - datetime.timedelta(minutes=5)
             query &= Q(updated_at__gte=five_minutes_ago)
         
+        # user_pkid가 제공된 경우 UserProfile에서 username을 조회하여 custom_id로 매칭
         if user_pkid:
-            query &= Q(user_pkid=user_pkid)
-        if user_id:
+            try:
+                user_profile = UserProfile.objects.get(id=int(user_pkid))
+                query &= Q(custom_id=user_profile.username)
+            except (UserProfile.DoesNotExist, ValueError):
+                # 사용자를 찾을 수 없으면 빈 결과 반환
+                result['success'] = True
+                result['count'] = 0
+                result['data'] = []
+                return JsonResponse(result, status=200)
+        elif user_id:
             query &= Q(custom_id=user_id)
         
         # 기기 목록 조회
@@ -1889,11 +2155,19 @@ def device_list_query(request):
         
         device_data = []
         for device in devices:
+            # custom_id로 UserProfile 조회하여 실제 user_pkid (UserProfile.id) 가져오기
+            actual_user_pkid = ''
+            try:
+                user_profile = UserProfile.objects.get(username=device.custom_id)
+                actual_user_pkid = str(user_profile.id)
+            except UserProfile.DoesNotExist:
+                actual_user_pkid = device.user_pkid  # fallback
+            
             device_data.append({
                 'device_id': device.id,
                 'remote_id': device.remote_id,
                 'user_id': device.custom_id,
-                'user_pkid': device.user_pkid,
+                'user_pkid': actual_user_pkid,
                 'agent_id': device.agent_id,
                 'alias': device.alias,
                 'hostname': device.hostname,
@@ -2100,6 +2374,120 @@ def certno_delete(request):
         print(f"[CERTNO_DELETE] reverse_key={reverse_cache_key}, not found")
         result['success'] = False
         result['message'] = _('삭제할 인증번호가 없습니다')
+    
+    return JsonResponse(result)
+
+
+@csrf_exempt
+def certno_cancel(request):
+    """인증번호 취소 API (원격지에서 요청)
+    
+    엔드포인트: POST /api/certno/cancel
+    Content-Type: application/json
+    
+    요청 데이터:
+    {
+        "customer_id": "imedix",
+        "user_pk_id": "3",
+        "mdesk_id": "5270854",
+        "cert_code": "3813"
+    }
+    
+    성공 응답:
+    {
+        "success": true,
+        "message": "인증번호가 취소되었습니다",
+        "data": {
+            "customer_id": "imedix",
+            "mdesk_id": "5270854",
+            "cert_code": "3813"
+        }
+    }
+    
+    실패 응답:
+    {
+        "success": false,
+        "error": "ERROR_CODE",
+        "message": "에러 메시지"
+    }
+    """
+    result = {}
+    
+    if request.method != 'POST':
+        result['success'] = False
+        result['error'] = 'METHOD_NOT_ALLOWED'
+        result['message'] = _('POST 방식으로 요청하세요.')
+        return JsonResponse(result, status=405)
+    
+    try:
+        data = json.loads(request.body.decode())
+    except:
+        result['success'] = False
+        result['error'] = 'INVALID_JSON'
+        result['message'] = _('잘못된 요청 형식입니다.')
+        return JsonResponse(result, status=400)
+    
+    # 요청 데이터 추출 (모두 문자열로 통일)
+    customer_id = str(data.get('customer_id', '')).strip()
+    user_pk_id = str(data.get('user_pk_id', '')).strip()
+    mdesk_id = str(data.get('mdesk_id', '')).strip()
+    cert_code = str(data.get('cert_code', '')).strip()
+    
+    # 필수 필드 확인
+    if not customer_id:
+        result['success'] = False
+        result['error'] = 'MISSING_CUSTOMER_ID'
+        result['message'] = _('customer_id는 필수 항목입니다.')
+        return JsonResponse(result, status=400)
+    
+    if not mdesk_id:
+        result['success'] = False
+        result['error'] = 'MISSING_MDESK_ID'
+        result['message'] = _('mdesk_id는 필수 항목입니다.')
+        return JsonResponse(result, status=400)
+    
+    if not cert_code:
+        result['success'] = False
+        result['error'] = 'MISSING_CERT_CODE'
+        result['message'] = _('cert_code는 필수 항목입니다.')
+        return JsonResponse(result, status=400)
+    
+    # 캐시 키 정의
+    cache_key = f'certno_{customer_id}_{mdesk_id}'
+    cert_only_key = f'certno_code_{cert_code}'
+    reverse_cache_key = f'certno_reverse_{customer_id}_{cert_code}'
+    
+    # 인증번호 검증 (저장된 값과 일치하는지 확인)
+    stored_cert_code = cache.get(cache_key)
+    
+    if not stored_cert_code:
+        result['success'] = False
+        result['error'] = 'CERT_NOT_FOUND'
+        result['message'] = _('취소할 인증번호가 없습니다.')
+        print(f"[CERTNO_CANCEL] cache_key={cache_key}, not found")
+        return JsonResponse(result, status=404)
+    
+    if stored_cert_code != cert_code:
+        result['success'] = False
+        result['error'] = 'CERT_MISMATCH'
+        result['message'] = _('인증번호가 일치하지 않습니다.')
+        print(f"[CERTNO_CANCEL] cert_code mismatch: stored={stored_cert_code}, requested={cert_code}")
+        return JsonResponse(result, status=400)
+    
+    # 모든 관련 캐시 삭제
+    cache.delete(cache_key)           # certno_{customer_id}_{mdesk_id}
+    cache.delete(cert_only_key)       # certno_code_{cert_code}
+    cache.delete(reverse_cache_key)   # certno_reverse_{customer_id}_{cert_code}
+    
+    print(f"[CERTNO_CANCEL] 인증번호 취소: customer_id={customer_id}, mdesk_id={mdesk_id}, cert_code={cert_code}")
+    
+    result['success'] = True
+    result['message'] = _('인증번호가 취소되었습니다')
+    result['data'] = {
+        'customer_id': customer_id,
+        'mdesk_id': mdesk_id,
+        'cert_code': cert_code
+    }
     
     return JsonResponse(result)
 
@@ -2336,8 +2724,9 @@ def download_client(request, customer_id):
     """클라이언트 다운로드 API
     
     엔드포인트: GET /api/download/{customer_id}
+    쿼리: certnum (선택) - 인증번호
     
-    파일명 형식: MDesk_portable-id={customer_id},certno=true.exe
+    파일명 형식: MDesk_portable-id={customer_id},certno=true[,certnum=인증번호].exe
     """
     from django.conf import settings
     
@@ -2348,8 +2737,12 @@ def download_client(request, customer_id):
     if not os.path.exists(file_path):
         raise Http404("파일을 찾을 수 없습니다.")
     
-    # 다운로드 파일명 설정
-    download_filename = f'MDesk_portable-id={customer_id},certno=true.exe'
+    # 다운로드 파일명 설정 (certnum 있으면 추가)
+    download_filename = f'MDesk_portable-id={customer_id},certno=true'
+    certnum = request.GET.get('certnum', '').strip()
+    if certnum:
+        download_filename += f',certnum={certnum}'
+    download_filename += '.exe'
     
     response = FileResponse(open(file_path, 'rb'), as_attachment=True, filename=download_filename)
     return response

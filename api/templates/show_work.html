@@ -4,52 +4,172 @@
 {% block legend_name %}대시보드{% endblock %}
 {% block link %}
 <style>
+  /* 통계 카드 */
+  .stat-card {
+    text-align: center;
+    padding: 20px 10px;
+  }
+  .stat-card .stat-number {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .stat-card .stat-label {
+    font-size: 13px;
+    color: #666;
+    margin-top: 6px;
+  }
+
+  /* 최근 접속 테이블 */
+  .recent-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .recent-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+  }
+  .recent-table tr:last-child td {
+    border-bottom: none;
+  }
+  .recent-table .remote-id {
+    color: #333;
+    font-weight: 500;
+  }
+  .recent-table .remote-sub {
+    color: #999;
+    font-size: 11px;
+  }
+  .recent-table .remote-time {
+    color: #888;
+    font-size: 12px;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  /* 정렬 가능한 테이블 */
   .sortable-table th {
     cursor: pointer;
     position: relative;
     user-select: none;
+    padding-right: 25px !important;
     transition: background-color 0.2s;
   }
   .sortable-table th:hover {
     background-color: #f0f0f0;
   }
   .sortable-table th::after {
-    content: '⇅';
+    content: '\2195';
     position: absolute;
     right: 8px;
     opacity: 0.3;
     font-size: 12px;
   }
   .sortable-table th.sort-asc::after {
-    content: '↑';
+    content: '\2191';
     opacity: 1;
     color: #1890ff;
   }
   .sortable-table th.sort-desc::after {
-    content: '↓';
+    content: '\2193';
     opacity: 1;
     color: #1890ff;
   }
-  .sortable-table th {
-    padding-right: 25px !important;
+
+  /* 페이지네이션 */
+  .pagination-wrap {
+    text-align: center;
+    padding: 10px 0;
+  }
+  .pagination-wrap .layui-btn a {
+    color: #fff;
+    text-decoration: none;
   }
 </style>
 {% endblock %}
+
 {% block content %}
 <div style="padding: 20px; background-color: #F2F2F2;">
   <div class="layui-row layui-col-space15">
+
     {% if not show_all %}
-    <div class="layui-col-md15">
+    <!-- ========== 대시보드: 통계 카드 ========== -->
+    <div class="layui-col-md4">
       <div class="layui-card">
-        <div class="layui-card-header">기기 통계 - 【사용자명:{{u.username}}】</div>
+        <div class="layui-card-body stat-card">
+          <div class="stat-number" style="color: #1890ff;">{{ connection_stats.today }}</div>
+          <div class="stat-label">오늘 연결</div>
+        </div>
+      </div>
+    </div>
+    <div class="layui-col-md4">
+      <div class="layui-card">
+        <div class="layui-card-body stat-card">
+          <div class="stat-number" style="color: #52c41a;">{{ connection_stats.week }}</div>
+          <div class="stat-label">이번 주 연결</div>
+        </div>
+      </div>
+    </div>
+    <div class="layui-col-md4">
+      <div class="layui-card">
+        <div class="layui-card-body stat-card">
+          <div class="stat-number" style="color: #722ed1;">{{ connection_stats.total }}</div>
+          <div class="stat-label">전체 연결</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 최근 접속한 원격지 ========== -->
+    <div class="layui-col-md12">
+      <div class="layui-card">
+        <div class="layui-card-header">
+          <i class="layui-icon layui-icon-list" style="margin-right: 5px;"></i>최근 접속한 원격지
+          <a href="/api/conn_log" style="float: right; font-size: 12px; color: #1890ff;">전체 로그 보기 →</a>
+        </div>
+        <div class="layui-card-body" style="padding: 0;">
+          {% if recent_remotes %}
+          <table class="recent-table">
+            <tbody>
+              {% for r in recent_remotes %}
+              <tr>
+                <td style="width: 50%;">
+                  <div class="remote-id">{{ r.alias|default:r.rid }}</div>
+                  {% if r.hostname and r.hostname != '-' and r.hostname != r.alias %}
+                  <div class="remote-sub">{{ r.hostname }} ({{ r.rid }})</div>
+                  {% else %}
+                  <div class="remote-sub">ID: {{ r.rid }}</div>
+                  {% endif %}
+                </td>
+                <td class="remote-time">{{ r.last_conn|date:"m/d H:i" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div style="padding: 30px; text-align: center; color: #999;">
+            <i class="layui-icon layui-icon-face-surprised" style="font-size: 36px; display: block; margin-bottom: 8px;"></i>
+            최근 접속 기록이 없습니다.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 내 기기 목록 ========== -->
+    <div class="layui-col-md12">
+      <div class="layui-card">
+        <div class="layui-card-header">
+          <i class="layui-icon layui-icon-cellphone" style="margin-right: 5px;"></i>내 기기 - 【{{ u.username }}】
+        </div>
         <div class="layui-card-body">
-          <table class="layui-table sortable-table" id="userDeviceTable">
+          <table class="layui-table sortable-table" id="userDeviceTable" lay-size="sm">
             <thead>
               <tr>
                 <th data-sort="string">클라이언트 ID</th>
                 <th data-sort="string">버전</th>
-                <th data-sort="string">연결 비밀번호</th>
-                <th data-sort="string">시스템 사용자명</th>
+                <th data-sort="string">비밀번호</th>
+                <th data-sort="string">사용자명</th>
                 <th data-sort="string">컴퓨터명</th>
                 <th data-sort="string">별칭</th>
                 <th data-sort="string">플랫폼</th>
@@ -57,28 +177,28 @@
                 <th data-sort="string">CPU</th>
                 <th data-sort="string">메모리</th>
                 <th data-sort="string">IP</th>
-                <th data-sort="date">등록 시간</th>
-                <th data-sort="date">업데이트 시간</th>
+                <th data-sort="date">등록</th>
+                <th data-sort="date">업데이트</th>
                 <th data-sort="string">상태</th>
               </tr>
             </thead>
             <tbody>
               {% for one in page_obj %}
               <tr>
-                <td>{{one.rid}} </td>
-                <td>{{one.version}}</td>
-                <td>{{one.has_rhash}}</td>
-                <td>{{one.username}}</td>
-                <td>{{one.hostname}}</td>
-                <td>{{one.alias}}</td>
-                <td>{{one.platform}}</td>
-                <td>{{one.os}}</td>
-                <td>{{one.cpu}}</td>
-                <td>{{one.memory}}</td>
-                <td>{{one.ip_address}}</td>
-                <td>{{one.create_time}}</td>
-                <td>{{one.update_time}}</td>
-                <td>{{one.status}} </td>
+                <td>{{ one.rid }}</td>
+                <td>{{ one.version }}</td>
+                <td>{{ one.has_rhash }}</td>
+                <td>{{ one.username }}</td>
+                <td>{{ one.hostname }}</td>
+                <td>{{ one.alias }}</td>
+                <td>{{ one.platform }}</td>
+                <td>{{ one.os }}</td>
+                <td>{{ one.cpu }}</td>
+                <td>{{ one.memory }}</td>
+                <td>{{ one.ip_address }}</td>
+                <td>{{ one.create_time }}</td>
+                <td>{{ one.update_time }}</td>
+                <td>{{ one.status }}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -86,68 +206,70 @@
         </div>
       </div>
     </div>
-    <div class="layui-col-md4 layui-col-md-offset4">
-      <span class="step-links">
-          {% if page_obj.has_previous %}
-              <button class="layui-btn" ><a href="?page=1">&laquo; 처음</a></button>
-              <button class="layui-btn" ><a href="?page={{ page_obj.previous_page_number }}">이전</a></button>
-          {% endif %}
-          {% if page_obj.paginator.num_pages > 1 %}
-          <span class="current">
-              페이지 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
-          </span>
-          {% endif %}
-          {% if page_obj.has_next %}
-              <button class="layui-btn" > <a href="?page={{ page_obj.next_page_number }}">다음</a></button>
-              <button class="layui-btn" ><a href="?page={{ page_obj.paginator.num_pages }}">마지막 &raquo;</a></button>
-          {% endif %}
-      </span>
-  </div>
+
+    <!-- 페이지네이션 -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="layui-col-md12">
+      <div class="pagination-wrap">
+        {% if page_obj.has_previous %}
+        <button class="layui-btn layui-btn-sm"><a href="?page=1">&laquo; 처음</a></button>
+        <button class="layui-btn layui-btn-sm"><a href="?page={{ page_obj.previous_page_number }}">이전</a></button>
+        {% endif %}
+        <span style="margin: 0 12px; color: #666;">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <button class="layui-btn layui-btn-sm"><a href="?page={{ page_obj.next_page_number }}">다음</a></button>
+        <button class="layui-btn layui-btn-sm"><a href="?page={{ page_obj.paginator.num_pages }}">마지막 &raquo;</a></button>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
     {% endif %}
 
-
     {% if u.is_admin and show_all %}
-    <div class="layui-col-md15">
+    <!-- ========== 관리자: 전체 기기 목록 ========== -->
+    <div class="layui-col-md12">
       <div class="layui-card">
-        <div class="layui-card-header">전체 사용자 &raquo;
-          <div class="layui-btn" ><a href="/api/down_peers">xlsx 내보내기</a></div>
+        <div class="layui-card-header">
+          <i class="layui-icon layui-icon-app" style="margin-right: 5px;"></i>전체 사용자 기기
+          <a href="/api/down_peers" class="layui-btn layui-btn-sm layui-btn-normal" style="float: right;">
+            <i class="layui-icon layui-icon-export"></i> xlsx 내보내기
+          </a>
         </div>
         <div class="layui-card-body">
-          <table class="layui-table sortable-table" id="adminDeviceTable">
+          <table class="layui-table sortable-table" id="adminDeviceTable" lay-size="sm">
             <thead>
               <tr>
                 <th data-sort="string">클라이언트 ID</th>
                 <th data-sort="string">소유 사용자</th>
                 <th data-sort="string">버전</th>
-                <th data-sort="string">시스템 사용자명</th>
+                <th data-sort="string">사용자명</th>
                 <th data-sort="string">컴퓨터명</th>
                 <th data-sort="string">시스템</th>
                 <th data-sort="string">CPU</th>
                 <th data-sort="string">메모리</th>
                 <th data-sort="string">IP</th>
-                <th data-sort="string">최근 상담원 번호</th>
-                <th data-sort="date">등록 일자</th>
-                <th data-sort="date">업데이트 시간</th>
+                <th data-sort="string">상담원</th>
+                <th data-sort="date">등록</th>
+                <th data-sort="date">업데이트</th>
                 <th data-sort="string">상태</th>
               </tr>
             </thead>
             <tbody>
-
               {% for one in page_obj %}
               <tr>
-                <td>{{one.rid}} </td>
-                <td>{{one.rust_user}} </td>
-                <td>{{one.version}} </td>
-                <td>{{one.username}} </td>
-                <td>{{one.hostname}} </td>
-                <td>{{one.os}} </td>
-                <td>{{one.cpu}} </td>
-                <td>{{one.memory}} </td>
-                <td>{{one.ip_address}}</td>
+                <td>{{ one.rid }}</td>
+                <td>{{ one.rust_user }}</td>
+                <td>{{ one.version }}</td>
+                <td>{{ one.username }}</td>
+                <td>{{ one.hostname }}</td>
+                <td>{{ one.os }}</td>
+                <td>{{ one.cpu }}</td>
+                <td>{{ one.memory }}</td>
+                <td>{{ one.ip_address }}</td>
                 <td>{% if one.latest_agent_num and one.latest_agent_num != '-' %}{{ one.latest_agent_num }}{% else %}-{% endif %}</td>
-                <td>{{one.create_time}} </td>
-                <td>{{one.update_time}} </td>
-                <td>{{one.status}} </td>
+                <td>{{ one.create_time }}</td>
+                <td>{{ one.update_time }}</td>
+                <td>{{ one.status }}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -155,84 +277,64 @@
         </div>
       </div>
     </div>
-    <div class="layui-col-md4 layui-col-md-offset4">
-      <span class="step-links">
-          {% if page_obj.has_previous %}
-              <button class="layui-btn" ><a href="?show_type=admin&page=1">&laquo; 처음</a></button>
-              <button class="layui-btn" ><a href="?show_type=admin&page={{ page_obj.previous_page_number }}">이전</a></button>
-          {% endif %}
-          {% if page_obj.paginator.num_pages > 1 %}
-          <span class="current">
-              페이지 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
-          </span>
-          {% endif %}
-          {% if page_obj.has_next %}
-              <button class="layui-btn" > <a href="?show_type=admin&page={{ page_obj.next_page_number }}">다음</a></button>
-              <button class="layui-btn" ><a href="?show_type=admin&page={{ page_obj.paginator.num_pages }}">마지막 &raquo;</a></button>
-          {% endif %}
-      </span>
-  </div>
+
+    <!-- 관리자 페이지네이션 -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="layui-col-md12">
+      <div class="pagination-wrap">
+        {% if page_obj.has_previous %}
+        <button class="layui-btn layui-btn-sm"><a href="?show_type=admin&page=1">&laquo; 처음</a></button>
+        <button class="layui-btn layui-btn-sm"><a href="?show_type=admin&page={{ page_obj.previous_page_number }}">이전</a></button>
+        {% endif %}
+        <span style="margin: 0 12px; color: #666;">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <button class="layui-btn layui-btn-sm"><a href="?show_type=admin&page={{ page_obj.next_page_number }}">다음</a></button>
+        <button class="layui-btn layui-btn-sm"><a href="?show_type=admin&page={{ page_obj.paginator.num_pages }}">마지막 &raquo;</a></button>
+        {% endif %}
+      </div>
+    </div>
     {% endif %}
-
-
-
+    {% endif %}
 
   </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 정렬 가능한 테이블 초기화
-    document.querySelectorAll('.sortable-table').forEach(function(table) {
-        var headers = table.querySelectorAll('th');
-        
-        headers.forEach(function(header, index) {
-            header.addEventListener('click', function() {
-                var sortType = header.getAttribute('data-sort');
-                var tbody = table.querySelector('tbody');
-                var rows = Array.from(tbody.querySelectorAll('tr'));
-                var isAsc = header.classList.contains('sort-asc');
-                
-                // 모든 헤더의 정렬 클래스 제거
-                headers.forEach(function(h) {
-                    h.classList.remove('sort-asc', 'sort-desc');
-                });
-                
-                // 현재 헤더에 정렬 클래스 추가
-                if (isAsc) {
-                    header.classList.add('sort-desc');
-                } else {
-                    header.classList.add('sort-asc');
-                }
-                
-                // 정렬
-                rows.sort(function(a, b) {
-                    var aVal = a.cells[index].textContent.trim();
-                    var bVal = b.cells[index].textContent.trim();
-                    
-                    if (sortType === 'date') {
-                        aVal = new Date(aVal) || 0;
-                        bVal = new Date(bVal) || 0;
-                    } else if (sortType === 'number') {
-                        aVal = parseFloat(aVal) || 0;
-                        bVal = parseFloat(bVal) || 0;
-                    } else {
-                        aVal = aVal.toLowerCase();
-                        bVal = bVal.toLowerCase();
-                    }
-                    
-                    if (aVal < bVal) return isAsc ? 1 : -1;
-                    if (aVal > bVal) return isAsc ? -1 : 1;
-                    return 0;
-                });
-                
-                // 정렬된 행 다시 추가
-                rows.forEach(function(row) {
-                    tbody.appendChild(row);
-                });
-            });
+  document.querySelectorAll('.sortable-table').forEach(function(table) {
+    var headers = table.querySelectorAll('th');
+    headers.forEach(function(header, index) {
+      header.addEventListener('click', function() {
+        var sortType = header.getAttribute('data-sort');
+        var tbody = table.querySelector('tbody');
+        var rows = Array.from(tbody.querySelectorAll('tr'));
+        var isAsc = header.classList.contains('sort-asc');
+
+        headers.forEach(function(h) { h.classList.remove('sort-asc', 'sort-desc'); });
+        header.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
+
+        rows.sort(function(a, b) {
+          var aVal = a.cells[index].textContent.trim();
+          var bVal = b.cells[index].textContent.trim();
+          if (sortType === 'date') {
+            aVal = new Date(aVal) || 0;
+            bVal = new Date(bVal) || 0;
+          } else if (sortType === 'number') {
+            aVal = parseFloat(aVal) || 0;
+            bVal = parseFloat(bVal) || 0;
+          } else {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+          }
+          if (aVal < bVal) return isAsc ? 1 : -1;
+          if (aVal > bVal) return isAsc ? -1 : 1;
+          return 0;
         });
+
+        rows.forEach(function(row) { tbody.appendChild(row); });
+      });
     });
+  });
 });
 </script>
 

@@ -121,9 +121,45 @@
 
         .btn-container {
             display: flex;
+            flex-direction: column;
             gap: 20px;
             justify-content: center;
+            align-items: center;
             flex-wrap: wrap;
+        }
+
+        .cert-no-input-wrap {
+            width: 100%;
+            max-width: 292px;
+            text-align: left;
+        }
+
+        .cert-no-input-wrap label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+            padding-left: 18px;
+        }
+
+        .cert-no-input {
+            width: 100%;
+            padding: 14px 18px;
+            font-size: 16px;
+            font-family: 'NanumSquareNeo', sans-serif;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .cert-no-input:focus {
+            border-color: var(--primary-color);
+        }
+
+        .cert-no-input::placeholder {
+            color: #aaa;
         }
 
         .download-btn.free {
@@ -172,6 +208,10 @@
             .btn-container {
                 flex-direction: column;
                 gap: 15px;
+            }
+
+            .cert-no-input-wrap {
+                max-width: 100%;
             }
         }
 
@@ -257,6 +297,10 @@
             지금 바로 다운로드하여 시작하세요
         </p>
         <div class="btn-container">
+            <div class="cert-no-input-wrap">
+                <label for="certNoInput">인증번호</label>
+                <input type="text" id="certNoInput" class="cert-no-input" placeholder="인증번호를 입력하세요" maxlength="10" autocomplete="off">
+            </div>
             <a href="#" class="download-btn free" onclick="downloadFree(); return false;">
                 <svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -267,8 +311,8 @@
             </a>
         </div>
         <div class="info-text">
-            관리자 페이지는 <strong>{{ domain }}</strong>에서 이용하실 수 있습니다.<br>
-            문의사항이 있으시면 관리자에게 연락해주세요.
+            상담원이 불러준 "<strong style="color: var(--primary-color); font-weight: 700;">인증번호</strong>"를 입력하고
+            "<strong style="color: var(--primary-color); font-weight: 700;">클라이언트 다운로드</strong>"를 실행해주세요.
         </div>
     </div>
 
@@ -283,8 +327,13 @@
 
     <script>
         function downloadFree() {
-            // MDesk 클라이언트 다운로드
-            window.location.href = '/api/download/imedix';
+            // MDesk 클라이언트 다운로드 (인증번호가 있으면 certnum 파라미터로 전달)
+            var certnum = document.getElementById('certNoInput').value.trim();
+            var url = '/api/download/mdesk';
+            if (certnum) {
+                url += '?certnum=' + encodeURIComponent(certnum);
+            }
+            window.location.href = url;
             
             // 다운로드 안내 표시 (1초 후)
             setTimeout(function() {
