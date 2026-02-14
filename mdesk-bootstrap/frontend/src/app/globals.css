@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: "Pretendard", "Noto Sans KR", sans-serif;
+  background: radial-gradient(circle at top left, #ecfdf5, #f8fafc 45%, #f1f5f9);
+  color: #0f172a;
+}
